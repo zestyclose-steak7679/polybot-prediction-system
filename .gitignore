@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+logs/
+*.db
+*.db-journal
+bankroll.txt
+peak_bankroll.txt
+last_train.txt
+regime_state.json
+killed_strategies.json
