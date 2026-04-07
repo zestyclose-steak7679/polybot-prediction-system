@@ -1,0 +1,15 @@
+Collecting python-telegram-bot
+  Using cached python_telegram_bot-22.7-py3-none-any.whl.metadata (17 kB)
+Collecting tabulate
+  Downloading tabulate-0.10.0-py3-none-any.whl.metadata (40 kB)
+Requirement already satisfied: httpcore>=1.0.9 in C:\Users\User\AppData\Local\Programs\Python\Python314\Lib\site-packages (from python-telegram-bot) (1.0.9)
+Requirement already satisfied: httpx<0.29,>=0.27 in C:\Users\User\AppData\Local\Programs\Python\Python314\Lib\site-packages (from python-telegram-bot) (0.28.1)
+Requirement already satisfied: anyio in C:\Users\User\AppData\Local\Programs\Python\Python314\Lib\site-packages (from httpx<0.29,>=0.27->python-telegram-bot) (4.13.0)
+Requirement already satisfied: certifi in C:\Users\User\AppData\Local\Programs\Python\Python314\Lib\site-packages (from httpx<0.29,>=0.27->python-telegram-bot) (2026.2.25)
+Requirement already satisfied: idna in C:\Users\User\AppData\Local\Programs\Python\Python314\Lib\site-packages (from httpx<0.29,>=0.27->python-telegram-bot) (3.11)
+Requirement already satisfied: h11>=0.16 in C:\Users\User\AppData\Local\Programs\Python\Python314\Lib\site-packages (from httpcore>=1.0.9->python-telegram-bot) (0.16.0)
+Using cached python_telegram_bot-22.7-py3-none-any.whl (745 kB)
+Downloading tabulate-0.10.0-py3-none-any.whl (39 kB)
+Installing collected packages: tabulate, python-telegram-bot
+
+Successfully installed python-telegram-bot-22.7 tabulate-0.10.0
