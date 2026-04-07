@@ -184,7 +184,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     # 7-8. Features + regime per market
     feature_map, history_map, regime_map, regime_vecs = {}, {}, {}, []
-    for _, row in df.iterrows():
+    for row in df.to_dict("records"):
         mid     = row["market_id"]
         history = get_history(mid, last_n=20)
         feats   = build_features(row, history)

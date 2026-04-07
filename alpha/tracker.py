@@ -34,7 +34,7 @@ def resolve_alpha_signals(current_markets: pd.DataFrame) -> int:
         return 0
 
     resolved_count = 0
-    for _, signal in unresolved.iterrows():
+    for signal in unresolved.to_dict("records"):
         market_rows = current_markets[current_markets["market_id"] == signal["market_id"]]
         if market_rows.empty:
             continue

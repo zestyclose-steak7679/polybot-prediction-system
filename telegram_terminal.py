@@ -185,7 +185,7 @@ def _build_positions() -> str:
         return "<b>OPEN POSITIONS</b>\n<code>No open bets</code>"
 
     rows = []
-    for _, b in bets.iterrows():
+    for b in bets.to_dict("records"):
         from data.database import _hours_open
         hold = _hours_open(b.get("placed_at", ""))
         rows.append([
@@ -212,7 +212,7 @@ def _build_history() -> str:
         return "<b>CLOSED BETS</b>\n<code>No closed bets yet</code>"
 
     rows = []
-    for _, b in bets.iterrows():
+    for b in bets.to_dict("records"):
         pnl_str = _usd(b.get("pnl"))
         clv_str = _clv_str(b.get("clv"))
         result = str(b.get("result", "?")).upper()
