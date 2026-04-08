@@ -4,11 +4,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Environment ───────────────────────────────────────────
-OPENAI_API_KEY   = os.getenv("OPENAI_API_KEY", "")
-
-# ── Telegram ──────────────────────────────────────────────
-TELEGRAM_TOKEN   = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # ── Bankroll ──────────────────────────────────────────────
 BANKROLL = float(os.getenv("BANKROLL", "1000"))

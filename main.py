@@ -83,8 +83,8 @@ def load_bankroll() -> float:
 def save_bankroll(amount: float):
     try:
         BANKROLL_FILE.write_text(str(round(amount, 2)))
-    except Exception as e:
-        logger.error(f"Failed to save bankroll: {e}")
+    except Exception:
+        pass
 
 
 def model_mode() -> str:
@@ -426,6 +426,9 @@ def main():
     parser.add_argument("--loop",     action="store_true")
     parser.add_argument("--backtest", action="store_true")
     args = parser.parse_args()
+
+    if not Path("polybot.db").exists():
+        open("polybot.db", "w").close()
 
     init_db()
     from data.price_history import init_price_history  
