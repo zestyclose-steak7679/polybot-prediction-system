@@ -58,7 +58,7 @@ def compute_alpha_thresholds(markets_df: pd.DataFrame, feature_map: dict, histor
     spread_liquidity: list[float] = []
     spread_volume_pressure: list[float] = []
 
-    for _, row in markets_df.iterrows():
+    for row in markets_df.to_dict("records"):
         market_id = row["market_id"]
         feats = feature_map.get(market_id)
         history = history_lookup.get(market_id)
@@ -267,7 +267,7 @@ def diagnose_alpha_signals(markets_df: pd.DataFrame, feature_map: dict, history_
             "thresholds": thresholds[alpha_name],
         }
 
-    for _, row in markets_df.iterrows():
+    for row in markets_df.to_dict("records"):
         market_id = row["market_id"]
         feats = feature_map.get(market_id)
         history = history_lookup.get(market_id)
@@ -313,7 +313,7 @@ def build_alpha_signals(markets_df: pd.DataFrame, feature_map: dict, regime_map:
 
     thresholds = compute_alpha_thresholds(markets_df, feature_map, history_lookup)
 
-    for _, row in markets_df.iterrows():
+    for row in markets_df.to_dict("records"):
         market_id = row["market_id"]
         feats = feature_map.get(market_id)
         history = history_lookup.get(market_id)
