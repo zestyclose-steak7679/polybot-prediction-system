@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 import numpy as np
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent))
 
 for proxy_key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"):
     os.environ[proxy_key] = ""
@@ -81,7 +81,10 @@ def load_bankroll() -> float:
         return BANKROLL
 
 def save_bankroll(amount: float):
-    BANKROLL_FILE.write_text(str(round(amount, 2)))
+    try:
+        BANKROLL_FILE.write_text(str(round(amount, 2)))
+    except Exception as e:
+        logger.error(f"Failed to save bankroll: {e}")
 
 
 def model_mode() -> str:
@@ -160,7 +163,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         logger.warning(f"Feature drift detected → size multiplier {drift_mult:.2f}")
 
     # 5. Fetch + filter
-    raw_df = fetch_markets()
+    raw_df = fetch_markets().head(100)
     cycle_metrics["raw_markets"] = len(raw_df)
     logger.info("Raw markets fetched: %s", len(raw_df))
     if raw_df.empty:
