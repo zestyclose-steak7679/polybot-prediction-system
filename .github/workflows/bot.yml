@@ -18,4 +18,21 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - run: python main.py
+      - name: Download polybot.db artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: polybot-db
+        continue-on-error: true
+
+      - name: Run Polybot
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
+
+      - name: Upload polybot.db artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: polybot-db
+          path: polybot.db
