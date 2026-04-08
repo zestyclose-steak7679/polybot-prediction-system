@@ -96,7 +96,7 @@ class BacktestEngine:
         records = []
         peak    = bankroll
 
-        for _, row in df.iterrows():
+        for row in df.to_dict("records"):
             edge = row.get("signal_edge") or 0
             if edge < threshold:
                 continue

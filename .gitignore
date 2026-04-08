@@ -1,4 +1,5 @@
 __pycache__/
+<<<<<< main-2750375218994372408
 *.pyc
 logs/
 *.db
@@ -8,3 +9,17 @@ peak_bankroll.txt
 last_train.txt
 regime_state.json
 killed_strategies.json
+=======
+*.py[cod]
+*$py.class
+.pytest_cache/
+.unittest_cache/
+*.db
+*.db-journal
+*.log
+bankroll.txt
+last_train.txt
+peak_bankroll.txt
+killed_strategies.json
+regime_state.json
+>>>>>> main
