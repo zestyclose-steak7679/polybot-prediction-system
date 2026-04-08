@@ -3164,3 +3164,51 @@
 2026-04-07 16:06:19,030 | INFO     | polybot.main | Alpha shadow leaders: reversion_gap=1.14865/n4 | late_drift=0.44893/n3
 2026-04-07 16:06:19,031 | INFO     | polybot.main | Cycle feedback | raw=27 enhanced=3 executed=1 blocked_threshold=24 blocked_risk=0 open=5 avg_hold=8.2h closed=0 timeout_closed=0 clv_closed=0 alpha_shadow=3
 2026-04-07 16:06:19,033 | INFO     | polybot.main | END | $890.00 | alerts=1 | regime=neutral | H/CLV-/META-
+2026-04-08 17:39:44,013 | INFO     | models.regime_model | Loaded KMeans regime model.
+2026-04-08 17:39:44,073 | INFO     | data.database | DB initialised.
+2026-04-08 17:39:44,087 | INFO     | alpha.tracker | Resolved 1 shadow alpha signals
+2026-04-08 17:39:44,133 | INFO     | data.database | DB initialised.
+2026-04-08 17:39:44,154 | INFO     | data.database | DB initialised.
+2026-04-08 17:39:44,176 | INFO     | data.database | DB initialised.
+2026-04-08 17:39:44,198 | INFO     | polybot.main | =================================================================
+2026-04-08 17:39:44,198 | INFO     | polybot.main | CYCLE | 2026-04-08T17:39:44.198244 | $1000.00
+2026-04-08 17:39:44,203 | INFO     | tracking.clv | Timed exit #1 [momentum]: TIMEOUT_WIN after 7.0h | P&L=+3.00 CLV=0.57692
+2026-04-08 17:39:44,207 | INFO     | polybot.main | Settlement | closed=1 timeout=1 returned=$13.00 avg_clv=0.57692
+2026-04-08 17:39:44,212 | INFO     | polybot.main | Drawdown -1.3% | within limit
+2026-04-08 17:39:44,213 | INFO     | polybot.main | Open bets: 7/8 | avg hold 1.0h | stale 0
+2026-04-08 17:39:44,213 | INFO     | polybot.main | Raw markets fetched: 1
+2026-04-08 17:39:44,213 | INFO     | polybot.main | Markets after filters: 1
+2026-04-08 17:39:44,216 | INFO     | polybot.main | Markets with sufficient history: 1
+2026-04-08 17:39:44,217 | INFO     | polybot.main | Shadow alpha: 0 logged | avg predicted CLV 0.00000 | modules: none
+2026-04-08 17:39:44,217 | INFO     | polybot.main | Regime: illiquid_spike | Active: ['momentum'] | Killed: ∅
+2026-04-08 17:39:44,218 | INFO     | polybot.main | Signals generated: 0 | Avg edge: 0.0000
+2026-04-08 17:39:44,221 | INFO     | polybot.main | Strategy weighting in research mode: need 20 closed bets, have 1
+2026-04-08 17:39:44,221 | INFO     | polybot.main | Enhanced signals: 0 | Avg edge: 0.0000
+2026-04-08 17:39:44,221 | INFO     | polybot.main | Size multipliers: DD=1.00 Drift=1.00 Total=1.00
+2026-04-08 17:39:44,222 | INFO     | polybot.main | Trade candidates after risk: 0 | Total exposure: $0.00
+2026-04-08 17:39:44,234 | INFO     | polybot.main | CLV | avg=0.57692 pos=100.0% sharpe=nan n=1
+2026-04-08 17:39:44,234 | INFO     | polybot.main | Cycle feedback | raw=0 enhanced=0 executed=0 blocked_threshold=0 blocked_risk=0 open=7 avg_hold=1.0h closed=1 timeout_closed=1 clv_closed=1 alpha_shadow=0
+2026-04-08 17:39:44,236 | INFO     | polybot.main | END | $1013.00 | alerts=0 | regime=illiquid_spike | H/CLV-/META-
+2026-04-08 17:39:44,256 | INFO     | data.database | DB initialised.
+2026-04-08 17:39:44,264 | INFO     | polybot.main | =================================================================
+2026-04-08 17:39:44,264 | INFO     | polybot.main | CYCLE | 2026-04-08T17:39:44.264637 | $1000.00
+2026-04-08 17:39:44,267 | INFO     | polybot.main | ok
+2026-04-08 17:39:44,267 | INFO     | polybot.main | Raw markets fetched: 1
+2026-04-08 17:39:44,267 | INFO     | polybot.main | Markets after filters: 1
+2026-04-08 17:39:44,270 | INFO     | polybot.main | Markets with sufficient history: 1
+2026-04-08 17:39:44,271 | INFO     | polybot.main | Shadow alpha: 0 logged | avg predicted CLV 0.00000 | modules: none
+2026-04-08 17:39:44,271 | INFO     | polybot.main | Regime: illiquid_spike | Active: ['momentum'] | Killed: ∅
+2026-04-08 17:39:44,272 | INFO     | polybot.main | Signals generated: 1 | Avg edge: 0.0800
+2026-04-08 17:39:44,273 | INFO     | polybot.main | Strategy weighting in research mode: need 20 closed bets, have 0
+2026-04-08 17:39:44,274 | INFO     | polybot.main | Enhanced signals: 1 | Avg edge: 0.1030
+2026-04-08 17:39:44,274 | INFO     | polybot.main | Size multipliers: DD=1.00 Drift=1.00 Total=1.00
+2026-04-08 17:39:44,274 | INFO     | polybot.main | Trade candidates after risk: 1 | Total exposure: $20.00
+2026-04-08 17:39:44,274 | INFO     | polybot.main | ALERT | momentum/illiquid_spike | YES 'Cycle trade?' edge=0.103 $20.00
+2026-04-08 17:39:44,285 | INFO     | polybot.main | Cycle feedback | raw=1 enhanced=1 executed=1 blocked_threshold=0 blocked_risk=0 open=1 avg_hold=0.0h closed=0 timeout_closed=0 clv_closed=0 alpha_shadow=0
+2026-04-08 17:39:44,285 | INFO     | polybot.main | END | $980.00 | alerts=1 | regime=illiquid_spike | H/CLV-/META-
+2026-04-08 17:39:44,308 | INFO     | data.database | DB initialised.
+2026-04-08 17:39:44,314 | INFO     | tracking.clv | Timed exit #1 [momentum]: TIMEOUT_WIN after 7.0h | P&L=+6.00 CLV=0.57692
+2026-04-08 17:41:37,274 | INFO     | models.regime_model | Loaded KMeans regime model.
+2026-04-08 17:41:37,308 | INFO     | data.database | DB initialised.
+2026-04-08 17:41:37,346 | INFO     | data.database | DB initialised.
+2026-04-08 17:41:37,365 | INFO     | data.database | DB initialised.
