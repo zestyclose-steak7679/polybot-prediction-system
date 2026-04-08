@@ -56,6 +56,10 @@ def _rebind_db_path(new_path: str):
             setattr(module, "DB_PATH", new_path)
 
 def init_db():
+    from pathlib import Path
+    if not Path(DB_PATH).exists():
+        open(DB_PATH, "w").close()
+
     schema = """
         CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
