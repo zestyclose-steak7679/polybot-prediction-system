@@ -28,25 +28,15 @@ jobs:
         with:
           python-version: "3.11"
 
-      - run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-<<<<<< fix/node20-deprecation-and-drift-monitor-14115091032253151072
       - name: Run bot
         run: python main.py
-=======
-      - name: Download polybot.db artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: polybot-db
-        continue-on-error: true
-
-      - name: Run Polybot
->>>>>> main
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-<<<<<< fix/node20-deprecation-and-drift-monitor-14115091032253151072
 
       - name: Save DB
         uses: actions/upload-artifact@v4
@@ -59,12 +49,3 @@ jobs:
         with:
           name: bankroll
           path: bankroll.txt
-=======
-        run: python main.py
-
-      - name: Upload polybot.db artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: polybot-db
-          path: polybot.db
->>>>>> main
