@@ -10,14 +10,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v4
+      - name: Restore DB
+        uses: actions/download-artifact@v4
+        with:
+          name: polybot-db
+        continue-on-error: true
+
+      - name: Restore bankroll
+        uses: actions/download-artifact@v4
+        with:
+          name: bankroll
+        continue-on-error: true
+
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - run: pip install -r requirements.txt
 
+<<<<<< fix/node20-deprecation-and-drift-monitor-14115091032253151072
+      - name: Run bot
+        run: python main.py
+=======
       - name: Download polybot.db artifact
         uses: actions/download-artifact@v3
         with:
@@ -25,10 +41,25 @@ jobs:
         continue-on-error: true
 
       - name: Run Polybot
+>>>>>> main
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+<<<<<< fix/node20-deprecation-and-drift-monitor-14115091032253151072
+
+      - name: Save DB
+        uses: actions/upload-artifact@v4
+        with:
+          name: polybot-db
+          path: polybot.db
+
+      - name: Save bankroll
+        uses: actions/upload-artifact@v4
+        with:
+          name: bankroll
+          path: bankroll.txt
+=======
         run: python main.py
 
       - name: Upload polybot.db artifact
@@ -36,3 +67,4 @@ jobs:
         with:
           name: polybot-db
           path: polybot.db
+>>>>>> main

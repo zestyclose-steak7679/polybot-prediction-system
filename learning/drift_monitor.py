@@ -59,7 +59,7 @@ def compute_drift_multiplier() -> tuple[float, dict]:
         return 1.0, {}
 
     numeric["snapshot_at"] = parsed["snapshot_at"]
-    today_mask  = pd.to_datetime(numeric["snapshot_at"]) >= pd.Timestamp.utcnow() - pd.Timedelta(hours=24)
+    today_mask  = pd.to_datetime(numeric["snapshot_at"], utc=True) >= pd.Timestamp.utcnow() - pd.Timedelta(hours=24)
     today_df    = numeric[today_mask].drop(columns=["snapshot_at"])
     history_df  = numeric[~today_mask].drop(columns=["snapshot_at"])
 
