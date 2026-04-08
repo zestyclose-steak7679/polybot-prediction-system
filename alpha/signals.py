@@ -58,7 +58,7 @@ def compute_alpha_thresholds(markets_df: pd.DataFrame, feature_map: dict, histor
     spread_liquidity: list[float] = []
     spread_volume_pressure: list[float] = []
 
-    for _, row in markets_df.iterrows():
+    for row in markets_df.to_dict("records"):
         market_id = row["market_id"]
         feats = feature_map.get(market_id)
         history = history_lookup.get(market_id)
@@ -121,123 +121,6 @@ def _make_signal(row: pd.Series, alpha_name: str, score: float, predicted_clv: f
         entry_price=round(side_price, 4),
         passed_live_threshold=predicted_clv >= ALPHA_LIVE_CLV_THRESHOLD,
     )
-
-
-def _late_drift(row: pd.Series, feats: dict, history: pd.DataFrame, regime: str) -> AlphaSignal | None:
-    if history.empty or len(history) < 5:
-        return None
-    if feats.get("near_resolution", 0) != 1 or feats.get("danger_zone", 0) == 1:
-        return None
-    mom_short = feats.get("mom_short", 0.0)
-    mom_medium = feats.get("mom_medium", 0.0)
-    accel = feats.get("mom_acceleration", 0.0)
-    vol_spike = feats.get("vol_spike_ratio", 1.0)
-
-    if np.sign(mom_short) == 0 or np.sign(mom_short) != np.sign(mom_medium) or np.sign(mom_short) != np.sign(accel):
-        return None
-    if vol_spike < 1.2:
-        return None
-
-    direction = "YES" if mom_short > 0 else "NO"
-    momentum_strength = abs(mom_short) + 0.75 * abs(mom_medium) + 1.25 * abs(accel)
-    score = min(0.35 + min(momentum_strength / 0.10, 1.0) * 0.45 + min(max(vol_spike - 1.0, 0.0), 1.5) * 0.10, 1.0)
-    predicted_clv = 0.002 + abs(mom_short) * 0.18 + abs(accel) * 0.12 + max(vol_spike - 1.0, 0.0) * 0.002
-
-    return _make_signal(
-        row,
-        "late_drift",
-        score,
-        predicted_clv,
-        direction,
-        f"Late drift: aligned momentum and acceleration with {vol_spike:.2f}x volume",
-        regime,
-        {
-            "mom_short": feats.get("mom_short", 0.0),
-            "mom_medium": feats.get("mom_medium", 0.0),
-            "mom_acceleration": feats.get("mom_acceleration", 0.0),
-            "vol_spike_ratio": feats.get("vol_spike_ratio", 1.0),
-            "hours_left": feats.get("hours_left", 999.0),
-        },
-    )
-
-
-def _reversion_gap(row: pd.Series, feats: dict, history: pd.DataFrame, regime: str) -> AlphaSignal | None:
-    if history.empty or len(history) < 5:
-        return None
-    z_score = feats.get("z_score", 0.0)
-    distance = feats.get("distance_from_mean", 0.0)
-    vol_spike = feats.get("vol_spike_ratio", 1.0)
-    accel = feats.get("mom_acceleration", 0.0)
-
-    if abs(z_score) < 1.8 or abs(distance) < 0.03:
-        return None
-    if vol_spike < 1.4:
-        return None
-    if np.sign(z_score) == np.sign(accel) and abs(accel) > 0.001:
-        return None
-
-    direction = "NO" if z_score > 0 else "YES"
-    exhaustion = min(abs(z_score) / 3.0 + abs(distance) * 8 + max(vol_spike - 1.0, 0.0) * 0.15, 1.0)
-    score = min(0.30 + exhaustion * 0.55, 1.0)
-    predicted_clv = 0.0025 + min(abs(z_score) * 0.0035 + abs(distance) * 0.12 + max(vol_spike - 1.0, 0.0) * 0.002, 0.05)
-
-    return _make_signal(
-        row,
-        "reversion_gap",
-        score,
-        predicted_clv,
-        direction,
-        f"Reversion gap: z={z_score:.2f}, dist={distance:.3f}, panic-like volume {vol_spike:.2f}x",
-        regime,
-        {
-            "z_score": z_score,
-            "distance_from_mean": distance,
-            "vol_spike_ratio": vol_spike,
-            "mom_acceleration": accel,
-        },
-    )
-
-
-def _spread_pressure(row: pd.Series, feats: dict, history: pd.DataFrame, regime: str) -> AlphaSignal | None:
-    if history.empty or len(history) < 5:
-        return None
-
-    spread = abs(1.0 - float(row["yes_price"]) - float(row["no_price"]))
-    liquidity = float(row.get("liquidity", 0.0) or 0.0)
-    volume = float(row.get("volume", 0.0) or 0.0)
-    prices = history["yes_price"].to_numpy(dtype=float)
-    price_range = float((prices.max() - prices.min()) / (np.mean(prices) + 1e-6))
-    avg_volume = float(history["volume"].mean()) if "volume" in history.columns else 0.0
-    volume_pressure = volume / (avg_volume + 1e-6) if avg_volume > 0 else 1.0
-
-    if spread < 0.03:
-        return None
-    if liquidity > 20000 and volume_pressure < 1.1:
-        return None
-
-    rolling_mean = float(prices.mean())
-    direction = "YES" if float(row["yes_price"]) < rolling_mean else "NO"
-    score = min(0.25 + min(spread / 0.08, 1.0) * 0.35 + min(price_range / 0.08, 1.0) * 0.20 + (1 if liquidity < 10000 else 0) * 0.10, 1.0)
-    predicted_clv = 0.0015 + min(spread * 0.18 + price_range * 0.05 + min(volume_pressure, 1.5) * 0.002, 0.04)
-
-    return _make_signal(
-        row,
-        "spread_pressure",
-        score,
-        predicted_clv,
-        direction,
-        f"Spread pressure: spread={spread:.3f}, range={price_range:.3f}, liquidity=${liquidity:,.0f}",
-        regime,
-        {
-            "spread": round(spread, 5),
-            "price_range": round(price_range, 5),
-            "volume_pressure": round(volume_pressure, 4),
-            "liquidity": liquidity,
-        },
-    )
-
-
-ALPHA_BUILDERS = (_late_drift, _reversion_gap, _spread_pressure)
 
 
 def _late_drift_candidate(row: pd.Series, feats: dict, history: pd.DataFrame, thresholds: dict) -> dict:
@@ -384,7 +267,7 @@ def diagnose_alpha_signals(markets_df: pd.DataFrame, feature_map: dict, history_
             "thresholds": thresholds[alpha_name],
         }
 
-    for _, row in markets_df.iterrows():
+    for row in markets_df.to_dict("records"):
         market_id = row["market_id"]
         feats = feature_map.get(market_id)
         history = history_lookup.get(market_id)
@@ -430,7 +313,7 @@ def build_alpha_signals(markets_df: pd.DataFrame, feature_map: dict, regime_map:
 
     thresholds = compute_alpha_thresholds(markets_df, feature_map, history_lookup)
 
-    for _, row in markets_df.iterrows():
+    for row in markets_df.to_dict("records"):
         market_id = row["market_id"]
         feats = feature_map.get(market_id)
         history = history_lookup.get(market_id)
