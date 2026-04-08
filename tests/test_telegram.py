@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
+<<<<<< testing-improvement-telegram-send-error-9118264119177855348
 import io
 import sys
 from datetime import datetime, UTC
@@ -11,6 +12,12 @@ sys.modules['config'] = MagicMock()
 from alerts import telegram
 from alerts.telegram import _utc_now
 
+=======
+<<<<<< test-telegram-send-11353423296918326904
+import io
+
+from alerts import telegram
+>>>>>> main
 
 class TestTelegram(unittest.TestCase):
     @patch('alerts.telegram.TELEGRAM_TOKEN', '')
@@ -56,7 +63,21 @@ class TestTelegram(unittest.TestCase):
         self.assertFalse(result)
         mock_logger_error.assert_called_once()
         self.assertIn("Telegram error", mock_logger_error.call_args[0][0])
+<<<<<< testing-improvement-telegram-send-error-9118264119177855348
 
+=======
+======
+import sys
+from datetime import datetime, UTC
+
+# Mock external dependencies BEFORE importing the module under test
+sys.modules['requests'] = MagicMock()
+sys.modules['config'] = MagicMock()
+
+from alerts.telegram import _utc_now
+
+class TestTelegram(unittest.TestCase):
+>>>>>> main
     @patch('alerts.telegram.datetime')
     def test_utc_now(self, mock_datetime):
         # Create a fixed datetime for testing
@@ -73,6 +94,7 @@ class TestTelegram(unittest.TestCase):
 
         # Assert the result is as expected
         self.assertEqual(result, fixed_now)
+<<<<<< testing-improvement-telegram-send-error-9118264119177855348
 
     @patch("alerts.telegram._send")
     def test_send_error(self, mock_send):
@@ -101,4 +123,9 @@ class TestTelegram(unittest.TestCase):
         self.assertFalse(result)
 
 if __name__ == "__main__":
+=======
+>>>>>> main
+
+if __name__ == '__main__':
+>>>>>> main
     unittest.main()

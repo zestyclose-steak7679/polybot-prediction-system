@@ -185,7 +185,7 @@ def _build_positions() -> str:
         return "<b>OPEN POSITIONS</b>\n<code>No open bets</code>"
 
     rows = []
-    for _, b in bets.iterrows():
+    for b in bets.to_dict("records"):
         from data.database import _hours_open
         hold = _hours_open(b.get("placed_at", ""))
         rows.append([
@@ -212,7 +212,7 @@ def _build_history() -> str:
         return "<b>CLOSED BETS</b>\n<code>No closed bets yet</code>"
 
     rows = []
-    for _, b in bets.iterrows():
+    for b in bets.to_dict("records"):
         pnl_str = _usd(b.get("pnl"))
         clv_str = _clv_str(b.get("clv"))
         result = str(b.get("result", "?")).upper()
@@ -397,10 +397,11 @@ async def cmd_terminal(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if ctx.job_queue:
         # Cancel any existing refresh job
-        for job in ctx.job_queue.get_jobs_by_name(REFRESH_JOB_KEY):
-            job.schedule_removal()
+        existing_job = ctx.chat_data.get(REFRESH_JOB_KEY)
+        if existing_job:
+            existing_job.schedule_removal()
 
-        ctx.job_queue.run_repeating(
+        new_job = ctx.job_queue.run_repeating(
             _auto_refresh,
             interval=REFRESH_INTERVAL,
             first=REFRESH_INTERVAL,
@@ -408,6 +409,7 @@ async def cmd_terminal(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id,
             data={"view": "summary"},
         )
+        ctx.chat_data[REFRESH_JOB_KEY] = new_job
     await update.message.reply_html(
         f"<i>Auto-refreshing every {REFRESH_INTERVAL}s. Use /stop to halt.</i>"
     )
@@ -415,8 +417,10 @@ async def cmd_terminal(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_stop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if ctx.job_queue:
-        for job in ctx.job_queue.get_jobs_by_name(REFRESH_JOB_KEY):
-            job.schedule_removal()
+        existing_job = ctx.chat_data.get(REFRESH_JOB_KEY)
+        if existing_job:
+            existing_job.schedule_removal()
+            del ctx.chat_data[REFRESH_JOB_KEY]
     await update.message.reply_html("<i>Auto-refresh stopped.</i>")
 
 
@@ -451,8 +455,9 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     # Store current view for auto-refresh
     if ctx.job_queue:
-        for job in ctx.job_queue.get_jobs_by_name(REFRESH_JOB_KEY):
-            job.data["view"] = view
+        existing_job = ctx.chat_data.get(REFRESH_JOB_KEY)
+        if existing_job:
+            existing_job.data["view"] = view
 
     try:
         await query.edit_message_text(
