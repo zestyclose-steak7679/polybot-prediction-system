@@ -51,7 +51,11 @@ class Signal:
 # Evidence basis: price discovery lag — not all info is priced instantly.
 # Failure mode: chasing after a move that's already exhausted.
 
+<<<<<< perf/optimize-strategies-iterrows-10941796727025481878
 def momentum_strategy(row: Mapping[str, Any]) -> Signal | None:
+=======
+def momentum_strategy(row: dict | pd.Series) -> Signal | None:
+>>>>>> main
     move = row["one_day_change"]   # positive = YES moved up
 
     if abs(move) < MOMENTUM_THRESHOLD:
@@ -96,7 +100,11 @@ def momentum_strategy(row: Mapping[str, Any]) -> Signal | None:
 # Evidence basis: mean reversion in prediction markets post-news.
 # Failure mode: genuine resolution events (when market IS right).
 
+<<<<<< perf/optimize-strategies-iterrows-10941796727025481878
 def reversal_strategy(row: Mapping[str, Any]) -> Signal | None:
+=======
+def reversal_strategy(row: dict | pd.Series) -> Signal | None:
+>>>>>> main
     move = row["one_day_change"]
 
     if abs(move) < REVERSAL_THRESHOLD:
@@ -144,7 +152,11 @@ def reversal_strategy(row: Mapping[str, Any]) -> Signal | None:
 # Evidence basis: volume as a proxy for information arrival.
 # Failure mode: volume from bots or market makers, not informative.
 
+<<<<<< perf/optimize-strategies-iterrows-10941796727025481878
 def volume_spike_strategy(row: Mapping[str, Any]) -> Signal | None:
+=======
+def volume_spike_strategy(row: dict | pd.Series) -> Signal | None:
+>>>>>> main
     liquidity = row["liquidity"]
     volume    = row["volume"]
 
