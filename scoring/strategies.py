@@ -50,7 +50,7 @@ class Signal:
 # Evidence basis: price discovery lag — not all info is priced instantly.
 # Failure mode: chasing after a move that's already exhausted.
 
-def momentum_strategy(row: pd.Series) -> Signal | None:
+def momentum_strategy(row: dict | pd.Series) -> Signal | None:
     move = row["one_day_change"]   # positive = YES moved up
 
     if abs(move) < MOMENTUM_THRESHOLD:
@@ -95,7 +95,7 @@ def momentum_strategy(row: pd.Series) -> Signal | None:
 # Evidence basis: mean reversion in prediction markets post-news.
 # Failure mode: genuine resolution events (when market IS right).
 
-def reversal_strategy(row: pd.Series) -> Signal | None:
+def reversal_strategy(row: dict | pd.Series) -> Signal | None:
     move = row["one_day_change"]
 
     if abs(move) < REVERSAL_THRESHOLD:
@@ -143,7 +143,7 @@ def reversal_strategy(row: pd.Series) -> Signal | None:
 # Evidence basis: volume as a proxy for information arrival.
 # Failure mode: volume from bots or market makers, not informative.
 
-def volume_spike_strategy(row: pd.Series) -> Signal | None:
+def volume_spike_strategy(row: dict | pd.Series) -> Signal | None:
     liquidity = row["liquidity"]
     volume    = row["volume"]
 
@@ -209,7 +209,7 @@ def run_strategies(df: pd.DataFrame, active: list[str]) -> list[Signal]:
     signals = []
     seen    = set()   # (market_id, side) pairs to avoid duplicate alerts
 
-    for _, row in df.iterrows():
+    for row in df.to_dict('records'):
         for name in active:
             fn = STRATEGY_MAP.get(name)
             if fn is None:
