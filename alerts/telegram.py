@@ -26,9 +26,12 @@ def _console_safe(text: str) -> str:
 
 def _send(text: str) -> bool:
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        logger.warning("Telegram token or chat ID is missing, skipping alert.")
         print(_console_safe(text))
         return False
     try:
+        if len(text) > 4096:
+            text = text[:4093] + "..."
         resp = SESSION.post(
             f"{TELEGRAM_API}/sendMessage",
             json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"},

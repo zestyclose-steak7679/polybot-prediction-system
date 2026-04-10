@@ -56,10 +56,12 @@ def allocate(signals: list, bankroll: float) -> list:
         weight          = sig.edge / total_edge
         edge_based_size = deployable * weight
 
-        # Kelly as a secondary cap
-        decimal_odds = 1 / sig.price if sig.price > 0 else 2.0
-        kelly        = kelly_bet(bankroll, sig.confidence, decimal_odds)
-        kelly_size   = kelly["bet_size"]
+        # Kelly formula: fraction = edge / (1 - price)
+        kelly_fraction = sig.edge / (1.0 - sig.price) if sig.price < 1.0 else 0.0
+        from config import KELLY_FRACTION
+        kelly_size = bankroll * kelly_fraction * KELLY_FRACTION
+
+        decimal_odds = (1.0 / sig.price) - 1.0 if sig.price > 0 else 2.0
 
         # Take the more conservative of the two
         bet_size = min(edge_based_size, kelly_size)
@@ -75,7 +77,7 @@ def allocate(signals: list, bankroll: float) -> list:
         allocations.append({
             "signal":            sig,
             "bet_size":          bet_size,
-            "kelly_raw":         kelly["kelly_raw"],
+            "kelly_raw":         kelly_fraction,
             "decimal_odds":      decimal_odds,
             "edge_weight":       round(weight, 4),
             "portfolio_pct":     round(bet_size / bankroll * 100, 2),

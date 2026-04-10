@@ -93,15 +93,18 @@ def run_all_checks(bankroll: float) -> tuple[bool, list[str]]:
     If all_ok is False, do not place bets.
     """
     messages = []
+    try:
+        ok, msg = check_drawdown(bankroll)
+        messages.append(msg)
+        if not ok:
+            return False, messages
 
-    ok, msg = check_drawdown(bankroll)
-    messages.append(msg)
-    if not ok:
-        return False, messages
+        ok, msg = check_open_positions()
+        messages.append(msg)
+        if not ok:
+            return False, messages
 
-    ok, msg = check_open_positions()
-    messages.append(msg)
-    if not ok:
-        return False, messages
-
-    return True, messages
+        return True, messages
+    except Exception as e:
+        logger.error(f"Error running risk checks: {e}")
+        return False, [f"Risk checks failed with error: {e}"]

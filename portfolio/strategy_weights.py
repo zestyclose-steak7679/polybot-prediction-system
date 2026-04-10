@@ -57,14 +57,18 @@ def compute_sharpe_weights(closed_bets: pd.DataFrame, window: int = 50) -> dict:
             weights[strat] = 0.1   # benefit of the doubt
             continue
         mean = float(clv.mean())
-        std  = float(clv.std()) + 1e-9
+        std  = float(clv.std()) + 1e-6
         sharpe = mean / std
         weights[strat] = max(sharpe, 0.0)
 
     total = sum(weights.values())
-    if total == 0:
+    if total <= 0:
         return {k: 1/len(weights) for k in weights} if weights else {}
 
-    normalised = {k: round(v/total, 4) for k,v in weights.items()}
+    vals = np.array(list(weights.values()))
+    exp_vals = np.exp(vals - np.max(vals))
+    softmax_vals = exp_vals / np.sum(exp_vals)
+    normalised = {k: round(float(v), 4) for k, v in zip(weights.keys(), softmax_vals)}
+
     logger.info("Strategy weights (Sharpe): " + str(normalised))
     return normalised

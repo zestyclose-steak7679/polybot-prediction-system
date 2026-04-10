@@ -25,18 +25,20 @@ def get_size_multiplier(bankroll: float) -> tuple[float, str]:
       15-20% → 50% size (caution)
       > 20%  → 0% (halt — handled by risk/controls.py separately)
     """
-    peak = _load_peak(bankroll)
-    if bankroll >= peak:
-        _save_peak(bankroll)
-        return 1.0, "✅ Normal"
+    try:
+        peak = _load_peak(bankroll)
+        if bankroll >= peak:
+            _save_peak(bankroll)
+            return 1.0, "✅ Normal"
 
-    drawdown = (peak - bankroll) / peak
+        drawdown = (peak - bankroll) / peak
 
-    if drawdown >= 0.20:
-        return 0.0, "🛑 HALT"
-    elif drawdown >= 0.15:
-        return 0.5, "⚠️ Caution"
-    elif drawdown >= 0.10:
-        return 0.75, "⚡ Reduced"
-    else:
-        return 1.0, "✅ Normal"
+        if drawdown >= 0.20:
+            return 0.0, "🛑 HALT"
+        elif drawdown >= 0.10:
+            return 0.5, "⚡ Reduced"
+        else:
+            return 1.0, "✅ Normal"
+    except Exception as e:
+        logger.error(f"Error calculating size multiplier: {e}")
+        return 1.0, "ok"

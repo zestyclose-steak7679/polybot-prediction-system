@@ -44,19 +44,19 @@ class TestRiskManager(unittest.TestCase):
         # scale = max(1.0 - 0.35 * 0.4, 0.4) = 0.86
         # adjusted size = 30.0 * 0.86 = 25.8
         # total size = 25.8 * 15 = 387.0
-        # max_total = 1000 * 0.30 = 300.0
-        # exposure scale = 300.0 / 387.0 = 0.7751938
-        # final size = 25.8 * 0.7751938 = 20.0
+        # max_total = 1000 * 0.20 = 200.0
+        # exposure scale = 200.0 / 387.0
+        # final size = 25.8 * exposure scale
         signals = [StubSignal(f"m{i}", "strategy_a") for i in range(15)]
         sizes_in = [30.0] * 15
 
         sizes_out = apply_risk_constraints(signals, sizes_in, 1000.0)
 
         self.assertEqual(len(sizes_out), 15)
-        # Check that total exposure doesn't exceed 300
-        self.assertAlmostEqual(sum(sizes_out), 300.0, places=1)
+        # Check that total exposure doesn't exceed 200
+        self.assertAlmostEqual(sum(sizes_out), 200.0, places=1)
         for s in sizes_out:
-            self.assertEqual(s, 20.0)
+            self.assertAlmostEqual(s, 13.33, places=2)
 
     @patch('portfolio.risk_manager._empirical_correlation')
     def test_apply_risk_constraints_correlation_adjustment(self, mock_corr):

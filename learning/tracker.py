@@ -115,6 +115,9 @@ def get_active_strategies() -> list[str]:
         )
         logger.warning(f"All strategies disabled — re-enabling best: {best}")
         active = [best]
+    elif not active and not disabled:
+        # Fallback if ACTIVE_STRATEGIES is empty or something weird happens
+        active = ACTIVE_STRATEGIES[:1] if ACTIVE_STRATEGIES else ["momentum"]
 
     return active
 

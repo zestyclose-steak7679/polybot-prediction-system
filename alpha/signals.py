@@ -152,8 +152,8 @@ def _late_drift_candidate(row: pd.Series, feats: dict, history: pd.DataFrame, th
     return {
         "passed": score >= thresholds["score_min"],
         "reason": "score_below_cutoff" if score < thresholds["score_min"] else "pass",
-        "score": score,
-        "predicted_clv": predicted_clv,
+        "score": float(np.clip(score, 0.0, 1.0)),
+        "predicted_clv": float(np.clip(predicted_clv, -0.5, 0.5)),
         "direction": "YES" if mom_short > 0 else "NO",
         "feature_payload": {
             "mom_short": mom_short,
@@ -194,8 +194,8 @@ def _reversion_gap_candidate(row: pd.Series, feats: dict, history: pd.DataFrame,
     return {
         "passed": score >= thresholds["score_min"],
         "reason": "score_below_cutoff" if score < thresholds["score_min"] else "pass",
-        "score": score,
-        "predicted_clv": predicted_clv,
+        "score": float(np.clip(score, 0.0, 1.0)),
+        "predicted_clv": float(np.clip(predicted_clv, -0.5, 0.5)),
         "direction": "NO" if z_score > 0 else "YES",
         "feature_payload": {
             "z_score": z_score,
@@ -233,8 +233,8 @@ def _spread_pressure_candidate(row: pd.Series, feats: dict, history: pd.DataFram
     return {
         "passed": score >= thresholds["score_min"],
         "reason": "score_below_cutoff" if score < thresholds["score_min"] else "pass",
-        "score": score,
-        "predicted_clv": predicted_clv,
+        "score": float(np.clip(score, 0.0, 1.0)),
+        "predicted_clv": float(np.clip(predicted_clv, -0.5, 0.5)),
         "direction": "YES" if float(row["yes_price"]) < float(prices.mean()) else "NO",
         "feature_payload": {
             "spread": round(spread, 5),

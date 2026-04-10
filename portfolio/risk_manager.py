@@ -7,7 +7,7 @@ import logging
 from config import MAX_BET_PCT
 logger = logging.getLogger(__name__)
 
-MAX_EXPOSURE = 0.30
+MAX_EXPOSURE = 0.20
 MAX_PER_SIDE = 0.10
 
 

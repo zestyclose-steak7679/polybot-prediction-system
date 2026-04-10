@@ -53,18 +53,25 @@ def log_prices(df: pd.DataFrame):
         return
 
     now = _utc_now().isoformat()
+
+    # Handle duplicates gracefully by grouping
+    df_dedup = df.groupby('market_id').last().reset_index()
+
     rows = [
         (row["market_id"], row["yes_price"],
          row.get("volume", 0), row.get("liquidity", 0), now)
-        for _, row in df.iterrows()
+        for _, row in df_dedup.iterrows()
     ]
-    with _conn() as con:
-        con.executemany(
-            "INSERT INTO price_history (market_id, yes_price, volume, liquidity, logged_at) VALUES (?,?,?,?,?)",
-            rows,
-        )
-        con.commit()
-    logger.debug(f"Logged {len(rows)} price snapshots")
+    try:
+        with _conn() as con:
+            con.executemany(
+                "INSERT INTO price_history (market_id, yes_price, volume, liquidity, logged_at) VALUES (?,?,?,?,?)",
+                rows,
+            )
+            con.commit()
+        logger.debug(f"Logged {len(rows)} price snapshots")
+    except Exception as e:
+        logger.error(f"Error logging prices: {e}")
 
 
 def get_history(market_id: str, last_n: int = 20) -> pd.DataFrame:
@@ -72,19 +79,23 @@ def get_history(market_id: str, last_n: int = 20) -> pd.DataFrame:
     Return last N price snapshots for a market, oldest first.
     Returns empty DataFrame if insufficient data.
     """
-    with _conn() as con:
-        df = pd.read_sql(
-            """SELECT yes_price, volume, liquidity, logged_at
-               FROM price_history
-               WHERE market_id = ?
-               ORDER BY logged_at DESC
-               LIMIT ?""",
-            con,
-            params=(market_id, last_n),
-        )
-    if df.empty:
-        return df
-    return df.iloc[::-1].reset_index(drop=True)   # oldest first
+    try:
+        with _conn() as con:
+            df = pd.read_sql(
+                """SELECT yes_price, volume, liquidity, logged_at
+                   FROM price_history
+                   WHERE market_id = ?
+                   ORDER BY logged_at DESC
+                   LIMIT ?""",
+                con,
+                params=(market_id, last_n),
+            )
+        if df.empty:
+            return pd.DataFrame()
+        return df.iloc[::-1].reset_index(drop=True)   # oldest first
+    except Exception as e:
+        logger.error(f"Failed to get price history: {e}")
+        return pd.DataFrame()
 
 
 def purge_old_history(days: int = 30):

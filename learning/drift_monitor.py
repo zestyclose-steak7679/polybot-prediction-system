@@ -91,6 +91,8 @@ def compute_drift_multiplier() -> tuple[float, dict]:
     else:
         multiplier = 1.0
 
+    multiplier = float(np.clip(multiplier, 0.0, 1.0))
+
     top_drifted = sorted(drift_report.items(), key=lambda x: x[1], reverse=True)[:5]
     if top_drifted:
         logger.info("Top drifted features: " + " | ".join(f"{k}={v:.2f}" for k,v in top_drifted))

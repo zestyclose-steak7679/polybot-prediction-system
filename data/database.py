@@ -282,8 +282,12 @@ def get_recent_alpha_signals(limit: int = 50):
         )
 
 def get_open_bets():
-    with _conn() as con:
-        return pd.read_sql("SELECT * FROM paper_bets WHERE result='open'", con)
+    try:
+        with _conn() as con:
+            return pd.read_sql("SELECT * FROM paper_bets WHERE result='open'", con)
+    except Exception as e:
+        logger.error(f"Error getting open bets: {e}")
+        return pd.DataFrame()
 
 
 def get_open_position_stats() -> dict:
@@ -305,20 +309,27 @@ def get_open_position_stats() -> dict:
     }
 
 def close_bet(bet_id, exit_price, closing_price, result, pnl, clv=None):
-    with _conn() as con:
-        bet = con.execute("SELECT bet_size FROM paper_bets WHERE id=?", (bet_id,)).fetchone()
-        roi = round(pnl / bet[0], 4) if bet and bet[0] > 0 else 0.0
-        con.execute(
-            """UPDATE paper_bets SET result=?,exit_price=?,closing_price=?,
-               pnl=?,roi=?,clv=?,closed_at=? WHERE id=?""",
-            (result, exit_price, closing_price, round(pnl,2), roi,
-             clv, _utc_now().isoformat(), bet_id))
-        con.commit()
+    try:
+        with _conn() as con:
+            bet = con.execute("SELECT bet_size FROM paper_bets WHERE id=?", (bet_id,)).fetchone()
+            roi = round(pnl / bet[0], 4) if bet and bet[0] > 0 else 0.0
+            con.execute(
+                """UPDATE paper_bets SET result=?,exit_price=?,closing_price=?,
+                   pnl=?,roi=?,clv=?,closed_at=? WHERE id=?""",
+                (result, exit_price, closing_price, round(pnl,2), roi,
+                 clv, _utc_now().isoformat(), bet_id))
+            con.commit()
+    except Exception as e:
+        logger.error(f"Error closing bet {bet_id}: {e}")
 
 def get_closed_bets(limit=500):
-    with _conn() as con:
-        return pd.read_sql(
-            f"SELECT * FROM paper_bets WHERE result!='open' ORDER BY placed_at DESC LIMIT {limit}", con)
+    try:
+        with _conn() as con:
+            df = pd.read_sql(f"SELECT * FROM paper_bets WHERE result!='open' ORDER BY placed_at DESC LIMIT {limit}", con)
+            return df if not df.empty else pd.DataFrame()
+    except Exception as e:
+        logger.error(f"Error getting closed bets: {e}")
+        return pd.DataFrame()
 
 def get_pnl_summary():
     rows = get_closed_bets()
