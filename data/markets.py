@@ -81,6 +81,18 @@ def _matches_target(parsed: dict, raw: dict, targets: set[str]) -> tuple[bool, s
     return False, "none"
 
 
+def fetch_single_market(market_id: str) -> dict | None:
+    """Fetch a single market by ID from Gamma API."""
+    try:
+        resp = SESSION.get(f"{GAMMA_URL}/markets/{market_id}", timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        if data:
+            return _parse_market(data)
+    except Exception as e:
+        logger.debug(f"Failed to fetch market {market_id}: {e}")
+    return None
+
 def fetch_markets(tags: list[str] = None) -> pd.DataFrame:
     """
     Fetch active binary markets from Gamma API.
