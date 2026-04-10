@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import UTC, datetime
 from config import MAX_POSITION_AGE_HOURS
 from data.database import get_open_bets, close_bet, get_closed_bets
-from data.markets import fetch_markets
+from data.markets import fetch_single_market
 
 logger = logging.getLogger(__name__)
 CLV_CAPTURE_HOURS = 48   # only capture closing price within 48h of resolution
@@ -34,7 +34,7 @@ def _hours_to_resolution(end_date_str: str) -> float:
         return 999.0
 
 
-def _hours_open(placed_at_str: str) -> float:
+def hours_open(placed_at_str: str) -> float:
     try:
         opened = datetime.fromisoformat(str(placed_at_str).replace("Z", "").split("+")[0])
         return max((_utc_now() - opened).total_seconds() / 3600, 0.0)
@@ -43,103 +43,105 @@ def _hours_open(placed_at_str: str) -> float:
 
 
 def settle_and_compute_clv(bankroll: float) -> tuple[float, dict]:
+    """
+    Called at the START of every cycle.
+    Returns updated bankroll + settlement stats dict.
+    """
+    stats = {
+        "closed_count": 0,
+        "timeout_closed_count": 0,
+        "clv_resolved_count": 0,
+        "returned_capital": 0.0,
+        "avg_clv_closed": None,
+    }
+
     open_bets = get_open_bets()
     if open_bets.empty:
-        return bankroll, {
-            "closed_count": 0,
-            "timeout_closed_count": 0,
-            "returned_capital": 0.0,
-            "avg_clv_closed": None,
-            "clv_resolved_count": 0,
-        }
+        return bankroll, stats
 
-    current_markets = fetch_markets()
-    closed_count = 0
-    timeout_closed_count = 0
-    returned_capital = 0.0
-    resolved_clvs: list[float] = []
+    now = datetime.now(UTC).replace(tzinfo=None)
+    clv_values = []
 
     for _, bet in open_bets.iterrows():
-        if current_markets.empty:
-            break
+        market_id = bet["market_id"]
+        entry_price = bet["entry_price"]
+        bet_size = bet["bet_size"]
+        side = bet["side"]
 
-        market_row = current_markets[current_markets["market_id"] == bet["market_id"]]
-        if market_row.empty:
+        # Get current market data
+        current = fetch_single_market(market_id)
+        if current is None:
             continue
 
-        row = market_row.iloc[0]
-        resolved_yes = row["yes_price"] >= 0.95
-        resolved_no  = row["yes_price"] <= 0.05
-        current_price = row["yes_price"] if bet["side"] == "YES" else row["no_price"]
-        hours_left = _hours_to_resolution(row.get("end_date",""))
-        hours_open = _hours_open(bet.get("placed_at", ""))
-        stale_position = hours_open >= MAX_POSITION_AGE_HOURS
+        current_price = current["yes_price"]
+        hours_open_val = hours_open(bet.get("placed_at", ""))
 
-        # CLV: only capture near resolution window (not early lifecycle noise)
-        clv = None
-        if hours_left <= CLV_CAPTURE_HOURS or stale_position:
-            clv = compute_clv(bet["entry_price"], current_price)
-        elif not (resolved_yes or resolved_no):
-            continue  # too early to settle or get meaningful CLV
+        # Determine if market resolved
+        is_resolved = (
+            current_price >= 0.95 or
+            current_price <= 0.05 or
+            current.get("closed", False)
+        )
+        is_stale = hours_open_val >= MAX_POSITION_AGE_HOURS
 
-        if stale_position and not (resolved_yes or resolved_no):
-            shares = bet["bet_size"] / bet["entry_price"] if bet["entry_price"] > 0 else 0.0
-            proceeds = shares * current_price
-            pnl = proceeds - bet["bet_size"]
-            result = "timeout_win" if pnl >= 0 else "timeout_loss"
-            bankroll += proceeds
-            returned_capital += proceeds
-            closed_count += 1
-            timeout_closed_count += 1
-            if clv is not None:
-                resolved_clvs.append(clv)
-            close_bet(bet["id"], current_price, current_price, result, pnl, clv)
-            logger.info(
-                "Timed exit #%s [%s]: %s after %.1fh | P&L=%+.2f CLV=%s",
-                bet["id"],
-                bet["strategy_tag"],
-                result.upper(),
-                hours_open,
-                pnl,
-                clv,
-            )
-            continue
+        if not (is_resolved or is_stale):
+            continue  # still live, skip
 
-        if not (resolved_yes or resolved_no):
-            # Still open but in CLV window — update closing snapshot without settling
-            # We don't close here, just log the CLV candidate
-            # (will settle next cycle when resolved)
-            continue
-
-        won = (bet["side"]=="YES" and resolved_yes) or (bet["side"]=="NO" and resolved_no)
-        decimal_odds = 1 / bet["entry_price"] if bet["entry_price"] > 0 else 2.0
-
-        if won:
-            pnl = bet["bet_size"] * (decimal_odds - 1)
-            result = "win"
-            bankroll += bet["bet_size"] * decimal_odds
-            returned_capital += bet["bet_size"] * decimal_odds
+        # --- Compute result ---
+        if side == "YES":
+            won = current_price >= 0.95
+            clv = (1.0 / entry_price) - (1.0 / current_price) if current_price > 0 else 0
         else:
-            pnl = -bet["bet_size"]
-            result = "loss"
+            won = current_price <= 0.05
+            no_entry = 1.0 - entry_price
+            no_current = 1.0 - current_price
+            clv = (1.0 / no_entry) - (1.0 / no_current) if no_current > 0 else 0
 
-        closed_count += 1
-        if clv is not None:
-            resolved_clvs.append(clv)
-        close_bet(bet["id"], current_price, current_price, result, pnl, clv)
-        logger.info(
-            f"Settled #{bet['id']} [{bet['strategy_tag']}]: "
-            f"{result.upper()} P&L=${pnl:+.2f} CLV={clv}"
+        # --- Compute P&L ---
+        if won:
+            pnl = bet_size * (1.0 / entry_price - 1.0)
+        else:
+            pnl = -bet_size
+
+        if is_stale and not is_resolved:
+            if side == "YES":
+                pnl = bet_size * (current_price / entry_price - 1.0)
+            else:
+                no_entry = 1.0 - entry_price
+                no_current = 1.0 - current_price
+                pnl = bet_size * (no_current / no_entry - 1.0)
+
+        returned = bet_size + pnl
+        bankroll += returned
+        stats["returned_capital"] += returned
+        clv_values.append(clv)
+
+        result = "win" if won else ("timeout_loss" if is_stale and pnl < 0 else "timeout_win" if is_stale else "loss")
+
+        close_bet(
+            bet_id=bet["id"],
+            exit_price=current_price,
+            closing_price=current_price,
+            result=result,
+            pnl=round(pnl, 4),
+            clv=round(clv, 5),
         )
 
-    avg_clv_closed = round(float(pd.Series(resolved_clvs).mean()), 5) if resolved_clvs else None
-    return bankroll, {
-        "closed_count": closed_count,
-        "timeout_closed_count": timeout_closed_count,
-        "returned_capital": round(returned_capital, 2),
-        "avg_clv_closed": avg_clv_closed,
-        "clv_resolved_count": len(resolved_clvs),
-    }
+        stats["closed_count"] += 1
+        if is_stale:
+            stats["timeout_closed_count"] += 1
+        if is_resolved:
+            stats["clv_resolved_count"] += 1
+
+        logger.info(
+            f"Settled #{bet['id']} [{bet['strategy_tag']}]: "
+            f"{result.upper()} P&L=${pnl:+.2f} CLV={clv:.5f}"
+        )
+
+    if clv_values:
+        stats["avg_clv_closed"] = round(sum(clv_values) / len(clv_values), 5)
+
+    return bankroll, stats
 
 
 def clv_report() -> dict:
