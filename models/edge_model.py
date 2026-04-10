@@ -72,8 +72,13 @@ def heuristic_edge(feats: dict, price: float) -> float:
     if abs(ratio) > 2.0:
         delta -= np.sign(ratio) * 0.01
 
+    from config import MIN_PRICE, MAX_PRICE
+
     # Clamp: never claim more than 8% adjustment
-    return float(np.clip(delta, -0.08, 0.08))
+    # Heuristic mode must clip output probability to [MIN_PRICE, MAX_PRICE] from config
+    prob = price + float(np.clip(delta, -0.08, 0.08))
+    prob = float(np.clip(prob, MIN_PRICE, MAX_PRICE))
+    return float(prob - price)
 
 
 # ── ML model (Mode B) ────────────────────────────────────
@@ -108,7 +113,8 @@ class EdgeModel:
                 count = con.execute(
                     "SELECT COUNT(*) FROM paper_bets WHERE result != 'open'"
                 ).fetchone()[0]
-            return count >= MIN_TRAIN_BETS
+            from config import MIN_BETS_TO_EVAL
+            return count >= 50
         except Exception:
             return False
 
@@ -216,7 +222,7 @@ class EdgeModel:
 
         # Heuristic fallback
         delta = heuristic_edge(feats, price)
-        prob  = float(np.clip(price + delta, 0.01, 0.99))
+        prob  = float(np.clip(price + delta, 0.0, 1.0))
         return prob
 
     def feature_importance(self) -> dict | None:

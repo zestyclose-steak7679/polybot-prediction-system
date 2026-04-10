@@ -22,6 +22,13 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
 
     before = len(df)
 
+    # Check for missing columns
+    required_cols = ["liquidity", "volume", "yes_price", "active", "closed", "market_id", "question", "one_day_change"]
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        logger.error(f"Missing columns in market data: {missing}")
+        return pd.DataFrame()
+
     df = df[df["liquidity"] >= MIN_LIQUIDITY]
     df = df[df["volume"]    >= MIN_VOLUME]
     df = df[df["yes_price"] >= MIN_PRICE]
@@ -30,5 +37,5 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     df = df[df["closed"] == False]  # noqa: E712
 
     after = len(df)
-    logger.info(f"Filters: {before} → {after} markets")
+    logger.info(f"Filters: {before} → {after} markets (dropped {before - after} markets due to filters)")
     return df.reset_index(drop=True)

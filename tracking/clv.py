@@ -19,11 +19,10 @@ def _utc_now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-def compute_clv(entry_price: float, closing_price: float) -> float | None:
+def compute_clv(entry_price: float, closing_price: float, direction: int) -> float | None:
     if not entry_price or not closing_price or entry_price <= 0 or closing_price <= 0:
         return None
-    closing_price = max(closing_price, 0.01)
-    return round((1 / entry_price) - (1 / closing_price), 5)
+    return round((closing_price - entry_price) * direction, 5)
 
 
 def _hours_to_resolution(end_date_str: str) -> float:
@@ -90,12 +89,12 @@ def settle_and_compute_clv(bankroll: float) -> tuple[float, dict]:
         # --- Compute result ---
         if side == "YES":
             won = current_price >= 0.95
-            clv = (1.0 / entry_price) - (1.0 / current_price) if current_price > 0 else 0
+            direction = 1
+            clv = (current_price - entry_price) * direction
         else:
             won = current_price <= 0.05
-            no_entry = 1.0 - entry_price
-            no_current = 1.0 - current_price
-            clv = (1.0 / no_entry) - (1.0 / no_current) if no_current > 0 else 0
+            direction = -1
+            clv = (current_price - entry_price) * direction
 
         # --- Compute P&L ---
         if won:
@@ -148,7 +147,7 @@ def clv_report() -> dict:
     df = get_closed_bets()
     clv_data = df["clv"].dropna() if not df.empty else pd.Series()
     if clv_data.empty:
-        return {"n":0,"avg_clv":None,"positive_rate":None,"clv_sharpe":None,"strategy_clv":{}}
+        return {"n":0,"avg_clv":0.0,"positive_rate":0.0,"clv_sharpe":0.0,"strategy_clv":{}}
 
     avg    = float(clv_data.mean())
     std    = float(clv_data.std()) + 1e-9

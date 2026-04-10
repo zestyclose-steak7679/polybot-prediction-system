@@ -84,7 +84,7 @@ def _matches_target(parsed: dict, raw: dict, targets: set[str]) -> tuple[bool, s
 def fetch_single_market(market_id: str) -> dict | None:
     """Fetch a single market by ID from Gamma API."""
     try:
-        resp = SESSION.get(f"{GAMMA_URL}/markets/{market_id}", timeout=10)
+        resp = SESSION.get(f"{GAMMA_URL}/markets/{market_id}", timeout=15)
         resp.raise_for_status()
         data = resp.json()
         if data:
@@ -125,7 +125,7 @@ def fetch_markets(tags: list[str] = None) -> pd.DataFrame:
             data = resp.json()
         except requests.RequestException as e:
             logger.error(f"Gamma API fetch failed: {e}")
-            break
+            return pd.DataFrame()
 
         if not data:
             break

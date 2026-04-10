@@ -166,22 +166,45 @@ def build_features(market_row: pd.Series, history: pd.DataFrame) -> dict | None:
     Returns None if insufficient data for reliable features.
     Minimum: 3 price snapshots.
     """
-    prices  = history["yes_price"].values if not history.empty else np.array([])
-    volumes = history["volume"].values    if not history.empty and "volume" in history else np.array([])
+    try:
+        prices  = history["yes_price"].values if not history.empty else np.array([])
+        volumes = history["volume"].values    if not history.empty and "volume" in history else np.array([])
+    except KeyError:
+        return None
 
     if len(prices) < 3:
         return None   # not enough history yet
 
-    feats = {
-        "price": float(market_row["yes_price"]),
-    }
-    feats.update(momentum_features(prices))
-    feats.update(reversion_features(prices))
-    feats.update(volume_features(volumes))
-    feats.update(liquidity_features(float(market_row.get("liquidity", 0))))
-    feats.update(time_features(str(market_row.get("end_date", ""))))
+    try:
+        feats = {
+            "price": float(market_row["yes_price"]),
+        }
+        feats.update(momentum_features(prices))
+        feats.update(reversion_features(prices))
+        feats.update(volume_features(volumes))
+        feats.update(liquidity_features(float(market_row.get("liquidity", 0))))
+        feats.update(time_features(str(market_row.get("end_date", ""))))
+    except Exception as e:
+        logger.debug(f"Feature build failed: {e}")
+        return None
 
-    return feats
+    # Clip features to their valid ranges
+    clipped = {}
+    for k, v in feats.items():
+        if k == "price":
+            clipped[k] = float(np.clip(v, 0.0, 1.0))
+        elif k in ["mom_short", "mom_medium", "mom_long", "distance_from_mean", "mom_acceleration"]:
+            clipped[k] = float(np.clip(v, -1.0, 1.0))
+        elif k in ["mom_ratio", "z_score", "vol_trend"]:
+            clipped[k] = float(np.clip(v, -10.0, 10.0))
+        elif k in ["std_dev"]:
+            clipped[k] = float(np.clip(v, 0.0, 1.0))
+        elif k in ["vol_spike_ratio", "liquidity_log"]:
+            clipped[k] = float(np.clip(v, 0.0, 20.0))
+        else:
+            clipped[k] = float(v)
+
+    return clipped
 
 
 def features_to_array(feats: dict) -> np.ndarray:

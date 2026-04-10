@@ -101,7 +101,8 @@ class CLVModel:
                 feats.get("volume", 1000),
                 feats.get("one_day_change", 0),
             ]])
-            return float(self.model.predict(X)[0])
+            pred = float(self.model.predict(X)[0])
+            return float(np.clip(pred, -0.5, 0.5))
         except Exception as e:
             logger.debug(f"CLV predict error: {e}")
             return 0.0

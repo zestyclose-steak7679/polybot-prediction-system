@@ -37,9 +37,13 @@ class RegimeModel:
                 pass
 
     def predict(self, regime_feats: dict) -> str:
-        if self.use_ml and self.kmeans is not None:
-            return self._ml_predict(regime_feats)
-        return self._rule_predict(regime_feats)
+        try:
+            if self.use_ml and self.kmeans is not None:
+                return self._ml_predict(regime_feats)
+            return self._rule_predict(regime_feats)
+        except Exception as e:
+            logger.warning(f"Regime prediction failed: {e}")
+            return "neutral"
 
     def _rule_predict(self, f: dict) -> str:
         vol    = f.get("volatility", 0)
@@ -68,14 +72,15 @@ class RegimeModel:
         """Online update of KMeans (called each cycle with new regime vector)."""
         try:
             from sklearn.cluster import MiniBatchKMeans
-        except ImportError:
+            if self.kmeans is None:
+                self.kmeans = MiniBatchKMeans(n_clusters=5, random_state=42)
+            self.kmeans.partial_fit(X)
+            self.use_ml = True
+            Path(REGIME_MODEL_PATH).parent.mkdir(exist_ok=True)
+            with open(REGIME_MODEL_PATH,"wb") as f:
+                pickle.dump(self.kmeans, f)
+        except Exception as e:
+            logger.warning(f"Regime model partial fit failed: {e}")
             return
-        if self.kmeans is None:
-            self.kmeans = MiniBatchKMeans(n_clusters=5, random_state=42)
-        self.kmeans.partial_fit(X)
-        self.use_ml = True
-        Path(REGIME_MODEL_PATH).parent.mkdir(exist_ok=True)
-        with open(REGIME_MODEL_PATH,"wb") as f:
-            pickle.dump(self.kmeans, f)
 
 regime_model = RegimeModel()
