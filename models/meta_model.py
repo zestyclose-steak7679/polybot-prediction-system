@@ -77,6 +77,9 @@ class MetaModel:
 
     def predict_weights(self, feats: dict, strategy_names: list) -> dict:
         """Return edge weight per strategy. Falls back to equal weights."""
+        if not strategy_names:
+            return {}
+
         if not self.is_trained or self.model is None:
             w = 1 / len(strategy_names)
             return {s: w for s in strategy_names}
