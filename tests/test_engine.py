@@ -1,5 +1,4 @@
 import unittest
-<<<<<< test-kelly-bet-calculation-7672285932092313780
 from unittest.mock import patch
 from scoring.engine import kelly_bet
 
@@ -60,8 +59,6 @@ class TestKellyBet(unittest.TestCase):
         self.assertEqual(res['kelly_raw'], 0.2)
         self.assertEqual(res['kelly_fraction_used'], 0.25)
 
-if __name__ == '__main__':
-=======
 import pandas as pd
 from scoring.engine import (
     score_market, _liquidity_score, _volume_momentum,
@@ -235,5 +232,4 @@ class TestEngine(unittest.TestCase):
         self.assertAlmostEqual(picks[0]["edge"], 0.06, places=4)
 
 if __name__ == "__main__":
->>>>>> main
     unittest.main()
