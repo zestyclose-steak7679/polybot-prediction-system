@@ -301,7 +301,10 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             sig.edge       = round(ep - sig.price, 4)
 
         mw = meta_w.get(sig.strategy, 1/max(len(routed),1))
-        combined = (0.45 * sig.edge) + (0.30 * clv_pred) + (0.15 * mw * sig.edge) + (0.10 * sw * sig.edge)
+        if not clv_model.is_trained:
+            combined = 0.60 * sig.edge + 0.25 * mw * sig.edge + 0.15 * sw * sig.edge
+        else:
+            combined = 0.45 * sig.edge + 0.30 * clv_pred + 0.15 * mw * sig.edge + 0.10 * sw * sig.edge
         sig.edge = round(combined, 4)
 
         if sig.edge >= EDGE_THRESHOLD:
