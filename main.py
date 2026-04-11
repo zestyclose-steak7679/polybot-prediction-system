@@ -105,7 +105,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     logger.info("CYCLE | %s | $%.2f", cycle_ts, bankroll)
 
     if startup:
-        send_startup()
+        send_startup(bankroll)
 
     cycle_metrics = {
         "raw_markets": 0,

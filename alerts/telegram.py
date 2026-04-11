@@ -52,25 +52,25 @@ def _send(text: str) -> bool:
 
 
 def send_pick_alert(pick: dict, bankroll: float):
+    q = pick.get('question', '')
+    if len(q) > 60:
+        q = q[:57] + "..."
+
+    price_cents = int(pick['price'] * 100)
+
     text = (
-        f"<b>POLYBOT PAPER PICK | {pick.get('strategy', '').upper()}</b>\n"
-        f"------------------------------\n"
-        f"<b>{pick['question']}</b>\n\n"
-        f"Bet {pick['side']} @ {pick['price']:.3f} ({pick['decimal_odds']:.2f}x)\n\n"
-        f"<b>Signal</b>\n"
-        f"  Edge:       {pick['edge']*100:.1f}%\n"
-        f"  Confidence: {pick.get('confidence', 0)*100:.1f}%\n"
-        f"  Reason:     {pick.get('reason', 'N/A')}\n\n"
-        f"<b>Sizing</b>\n"
-        f"  Bet size:   ${pick['bet_size']:.2f} ({pick['bet_size']/bankroll*100:.1f}% of ${bankroll:.0f})\n"
-        f"  Kelly raw:  {pick['kelly_raw']*100:.1f}%\n\n"
-        f"<b>Market</b>\n"
-        f"  Liquidity:  ${pick['liquidity']:,.0f}\n"
-        f"  Volume:     ${pick['volume']:,.0f}\n"
-        f"  24h move:   {pick['one_day_change']*100:+.1f}%\n"
-        f"  Closes:     {str(pick.get('end_date', ''))[:10] or 'N/A'}\n"
-        f"------------------------------\n"
-        f"<i>Paper trade only.</i>"
+        f"🎯 NEW SIGNAL\n\n"
+        f"📌 {q}\n\n"
+        f"Direction:  {pick['side']}\n"
+        f"Price:      {pick['price']:.2f}  ({price_cents}¢)\n"
+        f"Edge:       +{pick['edge']*100:.1f}%\n"
+        f"Bet size:   ${pick['bet_size']:.2f}\n"
+        f"Strategy:   {pick.get('strategy', 'N/A')}\n"
+        f"Regime:     {pick.get('regime', 'N/A')}\n"
+        f"Confidence: {pick.get('confidence', 0):.2f}\n\n"
+        f"💰 Bankroll: ${bankroll:,.2f}\n"
+        f"🕐 {_utc_now().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+        f"⚠️ Paper trade only."
     )
     return _send(text)
 
@@ -98,80 +98,72 @@ def send_summary(
     cycle_metrics = cycle_metrics or {}
     clv_stats = clv_stats or {}
 
-    strat_lines = ""
-    for s in strategy_stats:
-        roi_str = f"{s['roi']*100:.1f}%" if s.get("roi") is not None else "N/A"
-        wr_str = f"{s['win_rate']*100:.0f}%" if s.get("win_rate") is not None else "N/A"
-        avg_clv = _fmt_optional_float(s.get("avg_clv"), 4)
-        resolved_n = s.get("resolved_clv_n", 0)
-        status = "ACTIVE" if s["strategy"] in active_strategies else "OFF"
-        strat_lines += (
-            f"  {status:6s} {s['strategy']:13s} "
-            f"ROI {roi_str:>7} | WR {wr_str:>4} | n={s.get('n_bets', 0)} | "
-            f"CLV {avg_clv:>7} | resolved={resolved_n}\n"
-        )
+    # Performance
+    total_bets = stats.get('total_bets', 0)
+    wins = stats.get('wins', 0)
+    losses = stats.get('losses', 0)
+    win_rate = stats.get('win_rate', 0.0) * 100
+    roi = stats.get('roi', 0.0) * 100
+    pnl = stats.get('total_pnl', 0.0)
+    avg_clv = clv_stats.get("avg_clv", 0.0)
+    avg_clv_val = avg_clv if avg_clv is not None else 0.0
+    sharpe = stats.get('sharpe', 0.0)
+    sharpe_val = sharpe if sharpe is not None else 0.0
 
-    alpha_lines = ""
-    for alpha in (alpha_stats or [])[:3]:
-        status = "PROMOTED" if alpha.get("promoted") else "SHADOW"
-        alpha_lines += (
-            f"  {status:8s} {alpha['alpha_name']:13s} "
-            f"CLV {alpha.get('avg_clv', 0):>7.4f} | "
-            f"Hit {alpha.get('positive_rate', 0) * 100:>4.0f}% | n={alpha.get('n', 0)}\n"
-        )
-    alpha_section = f"<b>Alpha shadow</b>\n{alpha_lines}" if alpha_lines else ""
-
+    # Open Positions
     open_bets = position_stats.get("n_open", 0)
     avg_hold = position_stats.get("avg_hold_hours", 0.0)
     closed_this_cycle = cycle_metrics.get("closed_this_cycle", 0)
     timeout_closed = cycle_metrics.get("timeout_closed_this_cycle", 0)
-    clv_closed = cycle_metrics.get("clv_resolved_this_cycle", 0)
-    alpha_shadow = cycle_metrics.get("triggered_shadow_signals", 0)
-    alpha_resolved_total = cycle_metrics.get("alpha_resolved_total", 0)
-    avg_clv = _fmt_optional_float(clv_stats.get("avg_clv"), 5)
+
+    # Strategies
+    strat_items = []
+    for s in strategy_stats:
+        status_emoji = "✅" if s["strategy"] in active_strategies else "❌"
+        strat_items.append(f"{status_emoji} {s['strategy']}")
+    strat_line = "    | ".join(strat_items)
+
+    # Alpha Shadow
+    alpha_lines = ""
+    for alpha in (alpha_stats or [])[:3]:
+        alpha_lines += (
+            f"{alpha['alpha_name']:<14} CLV {alpha.get('avg_clv', 0):.2f}  "
+            f"Hit {alpha.get('positive_rate', 0) * 100:.0f}%  n={alpha.get('n', 0)}\n"
+        )
+
+    regime = clv_stats.get("regime", "N/A")
 
     text = (
-        f"<b>POLYBOT SUMMARY</b>\n"
-        f"------------------------------\n"
-        f"Time: {_utc_now().strftime('%Y-%m-%d %H:%M UTC')}\n"
-        f"Bankroll: <b>${bankroll:.2f}</b>\n"
-        f"New signals: {picks_count}\n\n"
-        f"<b>Overall (paper)</b>\n"
-        f"  Bets: {stats.get('total_bets', 0)} | W/L {stats.get('wins', 0)}/{stats.get('losses', 0)}\n"
-        f"  Win rate: {stats.get('win_rate', 0):.1f}%\n"
-        f"  ROI: {stats.get('roi', 0):+.2f}%\n"
-        f"  P&L: {pnl_sign}${stats.get('total_pnl', 0):.2f}\n"
-        f"  CLV resolved: {stats.get('clv_resolved_bets', 0)} | Avg CLV: {avg_clv}\n\n"
-        f"<b>Turnover</b>\n"
-        f"  Open bets: {open_bets} | Avg hold: {avg_hold:.1f}h\n"
-        f"  Closed this cycle: {closed_this_cycle} | Timeout exits: {timeout_closed}\n"
-        f"  CLV closed this cycle: {clv_closed} | Alpha shadow this cycle: {alpha_shadow}\n"
-        f"  Alpha resolved total: {alpha_resolved_total}\n\n"
-        f"<b>Strategy competition</b>\n"
-        f"{strat_lines}"
-        f"{alpha_section}"
-        f"Model: {model_mode}\n"
-        f"------------------------------"
+        f"📊 POLYBOT SUMMARY\n"
+        f"🕐 {_utc_now().strftime('%Y-%m-%d %H:%M UTC')}\n"
+        f"💰 Bankroll: ${bankroll:,.2f}  |  New signals: {picks_count}\n\n"
+        f"── PERFORMANCE ──\n"
+        f"Bets: {total_bets}  |  W/L: {wins}/{losses}  |  Win rate: {win_rate:.1f}%\n"
+        f"ROI: {pnl_sign}{roi:.2f}%  |  P&L: {pnl_sign}${pnl:.2f}\n"
+        f"Avg CLV: {avg_clv_val:.3f}  |  Sharpe: {sharpe_val:.3f}\n\n"
+        f"── OPEN POSITIONS ──\n"
+        f"Open: {open_bets}  |  Avg hold: {avg_hold:.1f}h\n"
+        f"Closed this cycle: {closed_this_cycle}  |  Timeouts: {timeout_closed}\n\n"
+        f"── STRATEGIES ──\n"
+        f"{strat_line}\n\n"
+        f"── ALPHA SHADOW ──\n"
+        f"{alpha_lines}\n"
+        f"── MODEL ──\n"
+        f"{model_mode}  |  Regime: {regime}\n"
+        f"─────────────────────────"
     )
     return _send(text)
 
 
 def send_risk_halt(reason: str, bankroll: float):
-    text = (
-        f"<b>POLYBOT RISK HALT</b>\n"
-        f"Bankroll: ${bankroll:.2f}\n"
-        f"Reason: {reason}"
-    )
+    text = f"🛑 RISK HALT\n\n{reason}\n\n💰 Bankroll: ${bankroll:.2f}"
     return _send(text)
 
 
-def send_startup():
-    return _send(
-        f"<b>POLYBOT STARTED</b>\n"
-        f"Paper mode | multi-strategy\n"
-        f"Time: {_utc_now().strftime('%Y-%m-%d %H:%M UTC')}"
-    )
+def send_startup(bankroll: float):
+    text = f"🚀 Polybot started\n💰 Bankroll: ${bankroll:.2f}"
+    return _send(text)
 
 
 def send_error(msg: str):
-    return _send(f"<b>POLYBOT ERROR</b>\n{msg}")
+    return _send(f"❌ ERROR\n\n{msg}")
