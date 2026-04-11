@@ -81,16 +81,20 @@ class MetaModel:
             w = 1 / len(strategy_names)
             return {s: w for s in strategy_names}
 
-        weights = {}
-        for i, strat in enumerate(strategy_names):
-            try:
-                X = np.array([[i, feats.get("edge_est",0), feats.get("confidence",0.5),
-                               feats.get("price",0.5), feats.get("liquidity",1000),
-                               feats.get("volume",1000), feats.get("one_day_change",0)]])
-                pred = float(self.model.predict(X)[0])
-                weights[strat] = max(pred, 0.0)
-            except Exception:
-                weights[strat] = 0.0
+        try:
+            X_batch = np.array([
+                [i, feats.get("edge_est", 0), feats.get("confidence", 0.5),
+                 feats.get("price", 0.5), feats.get("liquidity", 1000),
+                 feats.get("volume", 1000), feats.get("one_day_change", 0)]
+                for i in range(len(strategy_names))
+            ])
+            preds = self.model.predict(X_batch)
+            weights = {
+                strat: max(float(preds[i]), 0.0)
+                for i, strat in enumerate(strategy_names)
+            }
+        except Exception:
+            weights = {strat: 0.0 for strat in strategy_names}
 
         total = sum(weights.values())
         if total == 0:
