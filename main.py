@@ -431,6 +431,13 @@ def main():
     parser.add_argument("--backtest", action="store_true")
     args = parser.parse_args()
 
+    token = os.environ.get("TELEGRAM_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        logger.error("STARTUP ERROR: TELEGRAM_TOKEN or TELEGRAM_CHAT_ID not set. Alerts will not send.")
+    else:
+        logger.info("Telegram credentials loaded OK. Token prefix: %s... Chat: %s", token[:8], chat_id)
+
     if not Path("polybot.db").exists():
         open("polybot.db", "w").close()
 
