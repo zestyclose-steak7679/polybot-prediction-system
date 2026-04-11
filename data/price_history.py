@@ -104,3 +104,49 @@ def purge_old_history(days: int = 30):
     with _conn() as con:
         con.execute("DELETE FROM price_history WHERE logged_at < ?", (cutoff,))
         con.commit()
+
+def get_history_bulk(market_ids: list[str], last_n: int = 20) -> dict[str, pd.DataFrame]:
+    """
+    Return last N price snapshots for a list of markets in bulk.
+    Returns a dictionary mapping market_id -> DataFrame of snapshots (oldest first).
+    """
+    if not market_ids:
+        return {}
+
+    res = {m: pd.DataFrame() for m in market_ids}
+    batch_size = 900
+
+    for i in range(0, len(market_ids), batch_size):
+        batch = list(market_ids)[i:i+batch_size]
+        placeholders = ",".join(["?"] * len(batch))
+
+        try:
+            with _conn() as con:
+                df = pd.read_sql(
+                    f"""
+                    SELECT market_id, yes_price, volume, liquidity, logged_at
+                    FROM (
+                        SELECT market_id, yes_price, volume, liquidity, logged_at,
+                               ROW_NUMBER() OVER(PARTITION BY market_id ORDER BY logged_at DESC) as rn
+                        FROM price_history
+                        WHERE market_id IN ({placeholders})
+                    )
+                    WHERE rn <= ?
+                    ORDER BY market_id, logged_at ASC
+                    """,
+                    con,
+                    params=(*batch, last_n)
+                )
+
+            if df.empty:
+                continue
+
+            for m, group in df.groupby("market_id"):
+                res[m] = group.drop(columns=["market_id"]).reset_index(drop=True)
+
+        except Exception as e:
+            logger.warning(f"Bulk fetch failed: {e}. Falling back to sequential.")
+            for m in batch:
+                res[m] = get_history(m, last_n)
+
+    return res
