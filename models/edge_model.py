@@ -22,7 +22,7 @@ Don't trust an untrained model with real capital.
 import numpy as np
 import pandas as pd
 import sqlite3
-import pickle
+import skops.io as sio
 import logging
 from pathlib import Path
 from config import DB_PATH
@@ -30,7 +30,7 @@ from data.features import FEATURE_COLUMNS, features_to_array
 
 logger = logging.getLogger(__name__)
 
-MODEL_PATH     = "models/edge_model.pkl"
+MODEL_PATH     = "models/edge_model.skops"
 MIN_TRAIN_BETS = 50   # minimum closed bets before training ML model
 
 
@@ -72,8 +72,13 @@ def heuristic_edge(feats: dict, price: float) -> float:
     if abs(ratio) > 2.0:
         delta -= np.sign(ratio) * 0.01
 
+    from config import MIN_PRICE, MAX_PRICE
+
     # Clamp: never claim more than 8% adjustment
-    return float(np.clip(delta, -0.08, 0.08))
+    # Heuristic mode must clip output probability to [MIN_PRICE, MAX_PRICE] from config
+    prob = price + float(np.clip(delta, -0.08, 0.08))
+    prob = float(np.clip(prob, MIN_PRICE, MAX_PRICE))
+    return float(prob - price)
 
 
 # ── ML model (Mode B) ────────────────────────────────────
@@ -89,7 +94,7 @@ class EdgeModel:
         if Path(MODEL_PATH).exists():
             try:
                 with open(MODEL_PATH, "rb") as f:
-                    self.model      = pickle.load(f)
+                    self.model      = sio.load(f, trusted=['sklearn._loss.link.Interval', 'sklearn._loss.link.LogitLink', 'sklearn._loss.loss.HalfBinomialLoss'])
                     self.is_trained = True
                 logger.info("Loaded trained edge model from disk.")
             except Exception as e:
@@ -98,7 +103,7 @@ class EdgeModel:
     def _save(self):
         Path(MODEL_PATH).parent.mkdir(exist_ok=True)
         with open(MODEL_PATH, "wb") as f:
-            pickle.dump(self.model, f)
+            sio.dump(self.model, f)
         logger.info("Edge model saved.")
 
     def should_train(self) -> bool:
@@ -108,7 +113,8 @@ class EdgeModel:
                 count = con.execute(
                     "SELECT COUNT(*) FROM paper_bets WHERE result != 'open'"
                 ).fetchone()[0]
-            return count >= MIN_TRAIN_BETS
+            from config import MIN_BETS_TO_EVAL
+            return count >= 50
         except Exception:
             return False
 
@@ -216,7 +222,7 @@ class EdgeModel:
 
         # Heuristic fallback
         delta = heuristic_edge(feats, price)
-        prob  = float(np.clip(price + delta, 0.01, 0.99))
+        prob  = float(np.clip(price + delta, 0.0, 1.0))
         return prob
 
     def feature_importance(self) -> dict | None:

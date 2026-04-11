@@ -14,7 +14,10 @@ import argparse
 from pathlib import Path
 from datetime import UTC, datetime
 import numpy as np
+<<<<<< fix-duplicate-imports-12388635567410055694
 
+=======
+>>>>>> main
 sys.path.insert(0, str(Path(__file__).parent))
 
 for proxy_key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"):
@@ -25,7 +28,10 @@ for stream_name in ("stdout", "stderr"):
     if hasattr(stream, "reconfigure"):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
+import os
+os.makedirs("logs", exist_ok=True)
 Path("logs").mkdir(exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -77,13 +83,13 @@ def load_bankroll() -> float:
     try:
         return float(BANKROLL_FILE.read_text().strip())
     except Exception:
-        return BANKROLL
+        return float(BANKROLL)
 
 def save_bankroll(amount: float):
     try:
         BANKROLL_FILE.write_text(str(round(amount, 2)))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Could not save bankroll: {e}")
 
 
 def model_mode() -> str:
@@ -299,7 +305,10 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             sig.edge       = round(ep - sig.price, 4)
 
         mw = meta_w.get(sig.strategy, 1/max(len(routed),1))
-        combined = 0.45 * sig.edge + 0.30 * clv_pred + 0.15 * mw * sig.edge + 0.10 * sw * sig.edge
+        if not clv_model.is_trained:
+            combined = 0.60 * sig.edge + 0.25 * mw * sig.edge + 0.15 * sw * sig.edge
+        else:
+            combined = 0.45 * sig.edge + 0.30 * clv_pred + 0.15 * mw * sig.edge + 0.10 * sw * sig.edge
         sig.edge = round(combined, 4)
 
         if sig.edge >= EDGE_THRESHOLD:
@@ -425,6 +434,13 @@ def main():
     parser.add_argument("--loop",     action="store_true")
     parser.add_argument("--backtest", action="store_true")
     args = parser.parse_args()
+
+    token = os.environ.get("TELEGRAM_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        logger.error("STARTUP ERROR: TELEGRAM_TOKEN or TELEGRAM_CHAT_ID not set. Alerts will not send.")
+    else:
+        logger.info("Telegram credentials loaded OK. Token prefix: %s... Chat: %s", token[:8], chat_id)
 
     if not Path("polybot.db").exists():
         open("polybot.db", "w").close()

@@ -77,6 +77,9 @@ class MetaModel:
 
     def predict_weights(self, feats: dict, strategy_names: list) -> dict:
         """Return edge weight per strategy. Falls back to equal weights."""
+        if not strategy_names:
+            return {}
+
         if not self.is_trained or self.model is None:
             w = 1 / len(strategy_names)
             return {s: w for s in strategy_names}
@@ -92,10 +95,15 @@ class MetaModel:
             except Exception:
                 weights[strat] = 0.0
 
+        # weights = softmax(weights) so they sum to 1
         total = sum(weights.values())
         if total == 0:
             w = 1 / len(strategy_names)
             return {s: w for s in strategy_names}
-        return {k: v/total for k,v in weights.items()}
+
+        vals = np.array(list(weights.values()))
+        exp_vals = np.exp(vals - np.max(vals))
+        softmax_vals = exp_vals / np.sum(exp_vals)
+        return {k: float(v) for k, v in zip(weights.keys(), softmax_vals)}
 
 meta_model = MetaModel()

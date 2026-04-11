@@ -101,6 +101,16 @@ HTML = r"""<!DOCTYPE html>
 </div>
 
 <script>
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const C = (sel, conf) => new Chart(document.querySelector(sel), conf);
 const G = '#00ff88', R = '#ff4444', Y = '#ffd700', DIM = '#1a2a1a';
 const chartDefaults = { responsive:true, maintainAspectRatio:false,
@@ -161,7 +171,7 @@ async function load() {
   const maxPnl = Math.max(...strats.map(s=>Math.abs(s.pnl||0)), 1);
   document.getElementById('stratBars').innerHTML = strats.map(s=>`
     <div class="strat-bar">
-      <span class="bar-label">${s.strategy.toUpperCase()}</span>
+      <span class="bar-label">${esc(s.strategy).toUpperCase()}</span>
       <div class="bar-fill" style="width:${Math.abs((s.pnl||0)/maxPnl)*200}px;background:${(s.pnl||0)>=0?G:R}"></div>
       <span class="bar-val">CLV ${s.avg_clv!=null?(s.avg_clv*100).toFixed(2)+'%':'N/A'}</span>
       <span class="bar-val">${s.n} bets</span>
@@ -172,7 +182,7 @@ async function load() {
   const maxAlphaClv = Math.max(...alpha.map(a=>Math.abs(a.avg_clv||0)), 0.0001);
   document.getElementById('alphaBars').innerHTML = alpha.map(a=>`
     <div class="strat-bar">
-      <span class="bar-label">${a.alpha_name.toUpperCase()}</span>
+      <span class="bar-label">${esc(a.alpha_name).toUpperCase()}</span>
       <div class="bar-fill" style="width:${Math.abs((a.avg_clv||0)/maxAlphaClv)*200}px;background:${(a.avg_clv||0)>=0?G:R}"></div>
       <span class="bar-val">CLV ${a.avg_clv!=null?(a.avg_clv*100).toFixed(2)+'%':'N/A'}</span>
       <span class="bar-val">${a.n} obs</span>
@@ -183,12 +193,12 @@ async function load() {
   const trades = d.recent_trades || [];
   document.getElementById('tradesBody').innerHTML = trades.map(t=>`<tr>
     <td>${(t.placed_at||'').slice(0,10)}</td>
-    <td style="max-width:200px;overflow:hidden;white-space:nowrap">${t.question||''}</td>
-    <td>${t.strategy_tag||''}</td>
-    <td>${t.side||''}</td>
+    <td style="max-width:200px;overflow:hidden;white-space:nowrap">${esc(t.question)}</td>
+    <td>${esc(t.strategy_tag)}</td>
+    <td>${esc(t.side)}</td>
     <td>${(t.entry_price||0).toFixed(3)}</td>
     <td>${(t.bet_size||0).toFixed(2)}</td>
-    <td class="${t.result}">${(t.result||'').toUpperCase()}</td>
+    <td class="${esc(t.result)}">${esc(t.result).toUpperCase()}</td>
     <td class="${(t.pnl||0)>=0?'win':'loss'}">${t.pnl!=null?(t.pnl>=0?'+':'')+t.pnl.toFixed(2):'—'}</td>
     <td class="${(t.clv||0)>=0?'win':'loss'}">${t.clv!=null?(t.clv*100).toFixed(2)+'%':'—'}</td>
   </tr>`).join('');
@@ -196,9 +206,9 @@ async function load() {
   const alphaRows = d.recent_alpha || [];
   document.getElementById('alphaBody').innerHTML = alphaRows.map(a=>`<tr>
     <td>${(a.cycle_ts||'').slice(0,10)}</td>
-    <td style="max-width:200px;overflow:hidden;white-space:nowrap">${a.question||''}</td>
-    <td>${a.alpha_name||''}</td>
-    <td>${a.direction||''}</td>
+    <td style="max-width:200px;overflow:hidden;white-space:nowrap">${esc(a.question)}</td>
+    <td>${esc(a.alpha_name)}</td>
+    <td>${esc(a.direction)}</td>
     <td class="${(a.predicted_clv||0)>=0?'win':'loss'}">${a.predicted_clv!=null?(a.predicted_clv*100).toFixed(2)+'%':'â€”'}</td>
     <td class="${a.promoted?'win':'open'}">${a.promoted?'PROMOTED':'SHADOW'}</td>
     <td class="${(a.resolved_clv||0)>=0?'win':'loss'}">${a.resolved_clv!=null?(a.resolved_clv*100).toFixed(2)+'%':'â€”'}</td>

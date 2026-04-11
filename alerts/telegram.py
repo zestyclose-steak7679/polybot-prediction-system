@@ -4,16 +4,20 @@ Telegram Bot API sender. Uses requests only.
 """
 
 import logging
+import os
 from datetime import UTC, datetime
 
 import requests
 
-from config import TELEGRAM_CHAT_ID, TELEGRAM_TOKEN
-
 logger = logging.getLogger(__name__)
-TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 SESSION = requests.Session()
 SESSION.trust_env = False
+
+
+def _get_credentials():
+    token = os.environ.get("TELEGRAM_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID") or ""
+    return token.strip(), chat_id.strip()
 
 
 def _utc_now() -> datetime:
@@ -25,13 +29,19 @@ def _console_safe(text: str) -> str:
 
 
 def _send(text: str) -> bool:
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+    token, chat_id = _get_credentials()
+    if not token or not chat_id:
+        logger.warning("Telegram token or chat ID is missing, skipping alert.")
         print(_console_safe(text))
         return False
+
+    telegram_api = f"https://api.telegram.org/bot{token}"
     try:
+        if len(text) > 4096:
+            text = text[:4093] + "..."
         resp = SESSION.post(
-            f"{TELEGRAM_API}/sendMessage",
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"},
+            f"{telegram_api}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
             timeout=10,
         )
         resp.raise_for_status()

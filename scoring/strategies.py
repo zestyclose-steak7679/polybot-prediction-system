@@ -15,6 +15,7 @@ vol_spike | follow unusual volume            | informed-trader activity
 """
 
 from dataclasses import dataclass
+from typing import Any, Mapping
 import pandas as pd
 import numpy as np
 import logging
@@ -50,7 +51,11 @@ class Signal:
 # Evidence basis: price discovery lag — not all info is priced instantly.
 # Failure mode: chasing after a move that's already exhausted.
 
-def momentum_strategy(row: pd.Series) -> Signal | None:
+
+def momentum_strategy(row: Mapping[str, Any]) -> Signal | None:
+    if "one_day_change" not in row or row["one_day_change"] is None:
+        return None
+
     move = row["one_day_change"]   # positive = YES moved up
 
     if abs(move) < MOMENTUM_THRESHOLD:
@@ -95,7 +100,11 @@ def momentum_strategy(row: pd.Series) -> Signal | None:
 # Evidence basis: mean reversion in prediction markets post-news.
 # Failure mode: genuine resolution events (when market IS right).
 
-def reversal_strategy(row: pd.Series) -> Signal | None:
+
+def reversal_strategy(row: Mapping[str, Any]) -> Signal | None:
+    if "one_day_change" not in row or row["one_day_change"] is None:
+        return None
+
     move = row["one_day_change"]
 
     if abs(move) < REVERSAL_THRESHOLD:
@@ -143,7 +152,11 @@ def reversal_strategy(row: pd.Series) -> Signal | None:
 # Evidence basis: volume as a proxy for information arrival.
 # Failure mode: volume from bots or market makers, not informative.
 
-def volume_spike_strategy(row: pd.Series) -> Signal | None:
+
+def volume_spike_strategy(row: Mapping[str, Any]) -> Signal | None:
+    if "liquidity" not in row or "volume" not in row:
+        return None
+
     liquidity = row["liquidity"]
     volume    = row["volume"]
 
@@ -152,7 +165,7 @@ def volume_spike_strategy(row: pd.Series) -> Signal | None:
 
     # Expected volume is roughly proportional to liquidity
     # (this is a rough proxy — real calibration comes with data)
-    expected_volume = liquidity * 1.5
+    expected_volume = liquidity * 1.5 + 1e-6
     ratio = volume / expected_volume
 
     if ratio < VOLUME_SPIKE_RATIO:
@@ -209,7 +222,7 @@ def run_strategies(df: pd.DataFrame, active: list[str]) -> list[Signal]:
     signals = []
     seen    = set()   # (market_id, side) pairs to avoid duplicate alerts
 
-    for _, row in df.iterrows():
+    for row in df.to_dict('records'):
         for name in active:
             fn = STRATEGY_MAP.get(name)
             if fn is None:
