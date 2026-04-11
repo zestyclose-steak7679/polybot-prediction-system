@@ -6,11 +6,11 @@ except ImportError:
     pass
 
 # ── Environment ───────────────────────────────────────────
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or ""
 
 # ── Bankroll ──────────────────────────────────────────────
-BANKROLL = float(os.getenv("BANKROLL", "1000"))
+BANKROLL = float(os.environ.get("BANKROLL", "1000"))
 
 # ── Edge / Kelly ──────────────────────────────────────────
 EDGE_THRESHOLD   = 0.04   # minimum 4% estimated edge to alert
