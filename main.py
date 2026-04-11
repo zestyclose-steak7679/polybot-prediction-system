@@ -312,7 +312,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
                         + 0.15 * mw * sig.edge
                         + 0.10 * sw * sig.edge)
         else:
-            # CLV model untrained — redistribute its weight to raw edge
+
             combined = (0.60 * sig.edge
                         + 0.25 * mw * sig.edge
                         + 0.15 * sw * sig.edge)
