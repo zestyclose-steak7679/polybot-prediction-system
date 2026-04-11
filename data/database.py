@@ -4,10 +4,13 @@ import logging
 import os
 import sqlite3
 import sys
+from pathlib import Path
 
 import pandas as pd
 from datetime import UTC, datetime, timedelta
 from config import DB_PATH, ALERT_COOLDOWN_HOURS, MAX_POSITION_AGE_HOURS
+from data.price_history import init_price_history
+
 logger = logging.getLogger(__name__)
 _MEMORY_ANCHOR = None
 
@@ -56,7 +59,6 @@ def _rebind_db_path(new_path: str):
             setattr(module, "DB_PATH", new_path)
 
 def init_db():
-    from pathlib import Path
     if not Path(DB_PATH).exists():
         open(DB_PATH, "w").close()
 
@@ -129,7 +131,6 @@ def init_db():
                 with _conn() as con:
                     con.executescript(schema)
                     con.commit()
-                from data.price_history import init_price_history
                 init_price_history()
                 logger.info("DB initialised.")
                 return
@@ -153,7 +154,6 @@ def init_db():
                     con.commit()
         else:
             raise
-    from data.price_history import init_price_history
     init_price_history()
     logger.info("DB initialised.")
 

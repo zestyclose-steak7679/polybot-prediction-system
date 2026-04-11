@@ -31,6 +31,7 @@ DESIGN CHOICES vs the generic advice you received
 
 import asyncio
 import logging
+import math
 import os
 import sys
 from datetime import UTC, datetime
@@ -265,7 +266,6 @@ def _build_clv_report() -> str:
     Honest CLV significance report.
     clv = (1/entry_price) - (1/closing_price) — not model_edge.
     """
-    import math
     clv = clv_report()
     n = clv["n"]
 
@@ -333,7 +333,6 @@ def _build_clv_report() -> str:
 
 def _norm_cdf(x: float) -> float:
     """Approximate normal CDF."""
-    import math
     return (1.0 + math.erf(x / math.sqrt(2))) / 2
 
 
