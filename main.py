@@ -14,13 +14,6 @@ import argparse
 from pathlib import Path
 from datetime import UTC, datetime
 import numpy as np
-<<<<<< fix-main-merge-conflict-17086777371923714972
-=======
-<<<<<< fix-duplicate-imports-12388635567410055694
-
-=======
->>>>>> main
->>>>>> main
 sys.path.insert(0, str(Path(__file__).parent))
 
 for proxy_key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"):
