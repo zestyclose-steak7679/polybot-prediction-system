@@ -46,7 +46,7 @@ from data.database        import (init_db, was_recently_alerted, record_alert,
                                     get_open_position_stats,
                                     get_alpha_outcomes)
 from data.markets         import fetch_markets
-from data.price_history   import log_prices, get_history, purge_old_history
+from data.price_history   import log_prices, get_history, get_history_bulk, purge_old_history
 from data.features        import build_features
 from data.regime_features import compute_regime_features
 from scoring.filters      import apply_filters
@@ -188,9 +188,13 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     # 7-8. Features + regime per market
     feature_map, history_map, regime_map, regime_vecs = {}, {}, {}, []
+
+    market_ids = df["market_id"].tolist()
+    bulk_history = get_history_bulk(market_ids, last_n=20)
+
     for row in df.to_dict("records"):
         mid     = row["market_id"]
-        history = get_history(mid, last_n=20)
+        history = bulk_history.get(mid, pd.DataFrame())
         feats   = build_features(row, history)
         if not feats:
             continue
