@@ -90,6 +90,15 @@ def init_db():
             trade_id INTEGER, market_id TEXT,
             features_json TEXT, snapshot_at TEXT
         );
+        CREATE TABLE IF NOT EXISTS clv_predictions (
+            market_id TEXT PRIMARY KEY,
+            entry_price REAL,
+            predicted_clv REAL,
+            signal_edge REAL,
+            strategy TEXT,
+            cycle_ts TEXT,
+            created_at TEXT
+        );
         CREATE TABLE IF NOT EXISTS alpha_signals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             cycle_ts TEXT NOT NULL,

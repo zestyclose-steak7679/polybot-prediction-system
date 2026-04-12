@@ -52,6 +52,7 @@ from data.features        import build_features
 from data.regime_features import compute_regime_features
 from scoring.filters      import apply_filters, apply_diversity_filter
 from scoring.strategies   import run_strategies
+from scoring.engine       import compute_confidence
 from models.edge_model    import edge_model
 from models.clv_model     import clv_model
 from models.meta_model    import meta_model, MIN_SAMPLES as META_MIN_SAMPLES
@@ -59,17 +60,18 @@ from models.regime_model  import regime_model
 from portfolio.allocator  import allocate
 from portfolio.risk_manager import apply_risk_constraints
 from portfolio.strategy_weights import compute_sharpe_weights, get_strategy_weight_gate
-from tracking.clv         import settle_and_compute_clv, clv_report
+from tracking.clv         import settle_and_compute_clv, clv_report, log_predicted_clv
 from learning.tracker     import get_active_strategies, get_all_strategy_stats
 from learning.online_trainer import run_if_due
-from learning.drift_monitor  import compute_drift_multiplier
+from learning.drift_monitor  import compute_drift_multiplier, compute_edge_decay
 from learning.alpha_diagnostics import collect_alpha_diagnostics, log_alpha_diagnostics
 from learning.regime_stability import get_stable_regime
 from risk.controls        import run_all_checks
 from risk.strategy_killer import get_killed_strategies
 from risk.drawdown_controller import get_size_multiplier
 from alerts.telegram      import (send_pick_alert, send_summary,
-                                   send_startup, send_error, send_risk_halt)
+                                  send_risk_halt, send_startup, send_error,
+                                  send_weekly_report)
 from strategies.router    import StrategyRouter
 
 BANKROLL_FILE = Path("bankroll.txt")
@@ -288,6 +290,10 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         if not feats:
             continue
 
+        market_row = df[df["market_id"] == sig.market_id].iloc[0] if not df.empty else pd.Series()
+        history_df = get_history(sig.market_id) if sig.market_id in [s.market_id for s in signals] else pd.DataFrame()
+        sig.confidence = compute_confidence(sig, market_row, history_df)
+
         model_feats = {
             **feats,
             "price": sig.price, "edge_est": sig.edge,
@@ -329,8 +335,12 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     # 12. Drawdown + drift multipliers
     dd_mult, dd_status = get_size_multiplier(bankroll)
-    total_mult = dd_mult * drift_mult
-    logger.info(f"Size multipliers: DD={dd_mult:.2f} Drift={drift_mult:.2f} Total={total_mult:.2f}")
+    decay = compute_edge_decay()
+    total_mult = dd_mult * drift_mult * decay["decay_factor"]
+    logger.info(
+        "Size multipliers: DD=%.2f Drift=%.2f Decay=%.2f Total=%.2f | Decay status: %s",
+        dd_mult, drift_mult, decay["decay_factor"], total_mult, decay["status"]
+    )
 
     # 13. Portfolio + risk
     allocations = allocate(enhanced, bankroll)
@@ -377,6 +387,17 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         if bet_id and feature_map.get(sig.market_id):
             save_feature_snapshot(bet_id, sig.market_id,
                                   json.dumps(feature_map[sig.market_id]))
+
+            # Recompute predicted clv for logging to avoid variable scoping issues from loop above
+            pred_clv = clv_model.predict(feature_map[sig.market_id]) if clv_model.is_trained else 0.0
+            log_predicted_clv(
+                market_id=sig.market_id,
+                entry_price=sig.price,
+                predicted_clv=pred_clv,
+                signal_edge=sig.edge,
+                strategy=sig.strategy,
+                cycle_ts=cycle_metrics.get("cycle_start", datetime.now(UTC).replace(tzinfo=None).isoformat())
+            )
         bankroll -= bet_size
         new_alerts += 1
 
@@ -446,6 +467,43 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     )
 
     save_bankroll(bankroll)
+
+    # Weekly Report
+    weekly_file = Path("last_weekly.txt")
+    last_weekly = 0.0
+    if weekly_file.exists():
+        try:
+            last_weekly = float(weekly_file.read_text().strip())
+        except Exception:
+            pass
+    now_ts = datetime.now(UTC).timestamp()
+    if now_ts - last_weekly > 7 * 24 * 3600:
+        logger.info("Sending weekly report...")
+        period_str = f"{(datetime.now(UTC) - pd.Timedelta(days=7)).strftime('%Y-%m-%d')} to {datetime.now(UTC).strftime('%Y-%m-%d')}"
+        best_strat = sstats[0]["strategy"] if sstats else "N/A"
+        worst_strat = sstats[-1]["strategy"] if sstats else "N/A"
+        roi = stats.get('roi', 0.0)
+        weekly_stats = {
+            "period": period_str,
+            "bets": stats.get('total_bets', 0),
+            "wins": stats.get('wins', 0),
+            "losses": stats.get('losses', 0),
+            "win_rate": stats.get('win_rate', 0.0) * 100,
+            "roi": roi * 100 if abs(roi) < 10 else roi, # roi is already percent in get_pnl_summary, wait: roi in get_pnl_summary is already *100.
+            "pnl": stats.get('total_pnl', 0.0),
+            "avg_clv": clv.get("avg_clv", 0.0),
+            "best_strategy": best_strat,
+            "worst_strategy": worst_strat,
+            "regime_dist": dom_regime,
+            "bankroll": bankroll,
+            "bankroll_change": roi, # simplify bankroll change
+        }
+        # Actually stats["roi"] is already percentage from get_pnl_summary
+        weekly_stats["roi"] = stats.get('roi', 0.0)
+
+        send_weekly_report(weekly_stats)
+        weekly_file.write_text(str(now_ts))
+
     logger.info(f"END | ${bankroll:.2f} | alerts={new_alerts} | regime={dom_regime} | {mmode}")
     return bankroll
 

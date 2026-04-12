@@ -51,23 +51,31 @@ def _send(text: str) -> bool:
         return False
 
 
+def _quality_stars(confidence: float) -> str:
+    if confidence >= 0.75: return "⭐⭐⭐ High"
+    elif confidence >= 0.50: return "⭐⭐ Medium"
+    else: return "⭐ Low"
+
+
 def send_pick_alert(pick: dict, bankroll: float):
     q = pick.get('question', '')
     if len(q) > 60:
         q = q[:57] + "..."
 
     price_cents = int(pick['price'] * 100)
+    conf = pick.get('confidence', 0)
+    stars = _quality_stars(conf)
 
     text = (
         f"🎯 NEW SIGNAL\n\n"
         f"📌 {q}\n\n"
-        f"Direction:  {pick['side']}\n"
-        f"Price:      {pick['price']:.2f}  ({price_cents}¢)\n"
-        f"Edge:       +{pick['edge']*100:.1f}%\n"
-        f"Bet size:   ${pick['bet_size']:.2f}\n"
-        f"Strategy:   {pick.get('strategy', 'N/A')}\n"
-        f"Regime:     {pick.get('regime', 'N/A')}\n"
-        f"Confidence: {pick.get('confidence', 0):.2f}\n\n"
+        f"Direction:   {pick['side']}\n"
+        f"Price:       {pick['price']:.2f}  ({price_cents}¢)\n"
+        f"Edge:        +{pick['edge']*100:.1f}%\n"
+        f"Confidence:  {stars}  ({conf:.2f})\n"
+        f"Bet size:    ${pick['bet_size']:.2f}\n"
+        f"Strategy:    {pick.get('strategy', 'N/A')}\n"
+        f"Regime:      {pick.get('regime', 'N/A')}\n\n"
         f"💰 Bankroll: ${bankroll:,.2f}\n"
         f"🕐 {_utc_now().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
         f"⚠️ Paper trade only."
@@ -167,3 +175,33 @@ def send_startup(bankroll: float):
 
 def send_error(msg: str):
     return _send(f"❌ ERROR\n\n{msg}")
+
+
+def send_weekly_report(stats: dict) -> None:
+    """Send weekly performance summary to Telegram."""
+    token, chat_id = _get_credentials()
+    if not token or not chat_id:
+        return
+    msg = (
+        f"📅 <b>WEEKLY REPORT</b>\n"
+        f"{'─'*28}\n"
+        f"Period: {stats['period']}\n\n"
+        f"<b>Performance</b>\n"
+        f"  Bets: {stats['bets']}  |  W/L: {stats['wins']}/{stats['losses']}\n"
+        f"  Win rate: {stats['win_rate']:.1f}%\n"
+        f"  ROI: {stats['roi']:+.2f}%\n"
+        f"  P&L: ${stats['pnl']:+.2f}\n"
+        f"  Avg CLV: {stats['avg_clv']:.4f}\n\n"
+        f"<b>Best strategy</b>: {stats['best_strategy']}\n"
+        f"<b>Worst strategy</b>: {stats['worst_strategy']}\n"
+        f"<b>Regime distribution</b>: {stats['regime_dist']}\n"
+        f"{'─'*28}\n"
+        f"💰 Bankroll: <b>${stats['bankroll']:.2f}</b>\n"
+        f"📈 7-day change: {stats['bankroll_change']:+.2f}%"
+    )
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(url, json={"chat_id": chat_id, "text": msg,
+                                 "parse_mode": "HTML"}, timeout=10)
+    except Exception as e:
+        logger.error("Weekly report send failed: %s", e)

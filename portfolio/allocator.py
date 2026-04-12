@@ -59,7 +59,10 @@ def allocate(signals: list, bankroll: float) -> list:
         # Kelly formula: fraction = edge / (1 - price)
         kelly_fraction = sig.edge / (1.0 - sig.price) if sig.price < 1.0 else 0.0
         from config import KELLY_FRACTION
-        kelly_size = bankroll * kelly_fraction * KELLY_FRACTION
+        base_kelly_size = bankroll * kelly_fraction * KELLY_FRACTION
+
+        # Scale Kelly bet by confidence
+        kelly_size = base_kelly_size * (0.5 + 0.5 * getattr(sig, "confidence", 0.0))
 
         decimal_odds = (1.0 / sig.price) - 1.0 if sig.price > 0 else 2.0
 
