@@ -15,6 +15,7 @@ SESSION.trust_env = False
 
 
 def _get_credentials():
+    import os
     token = os.environ.get("TELEGRAM_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
     chat_id = os.environ.get("TELEGRAM_CHAT_ID") or ""
     return token.strip(), chat_id.strip()

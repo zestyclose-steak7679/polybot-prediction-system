@@ -7,6 +7,9 @@ to avoid noisy early-lifecycle prices.
 import logging
 import pandas as pd
 from datetime import UTC, datetime
+import sqlite3
+import os as _os
+_DB_PATH = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "polybot.db")
 from config import MAX_POSITION_AGE_HOURS
 from data.database import get_open_bets, close_bet, get_closed_bets
 from data.markets import fetch_single_market
@@ -23,9 +26,6 @@ def log_predicted_clv(market_id: str, entry_price: float,
                        predicted_clv: float, signal_edge: float,
                        strategy: str, cycle_ts: str) -> None:
     """Log predicted CLV at bet placement time for later accuracy analysis."""
-    import sqlite3
-import os as _os
-_DB_PATH = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "polybot.db")
     try:
         conn = sqlite3.connect(_DB_PATH)
 
