@@ -488,18 +488,16 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             "bets": stats.get('total_bets', 0),
             "wins": stats.get('wins', 0),
             "losses": stats.get('losses', 0),
-            "win_rate": stats.get('win_rate', 0.0) * 100,
-            "roi": roi * 100 if abs(roi) < 10 else roi, # roi is already percent in get_pnl_summary, wait: roi in get_pnl_summary is already *100.
+            "win_rate": stats.get('win_rate', 0.0),
+            "roi": stats.get('roi', 0.0),
             "pnl": stats.get('total_pnl', 0.0),
             "avg_clv": clv.get("avg_clv", 0.0),
             "best_strategy": best_strat,
             "worst_strategy": worst_strat,
             "regime_dist": dom_regime,
             "bankroll": bankroll,
-            "bankroll_change": roi, # simplify bankroll change
+            "bankroll_change": stats.get('roi', 0.0),
         }
-        # Actually stats["roi"] is already percentage from get_pnl_summary
-        weekly_stats["roi"] = stats.get('roi', 0.0)
 
         send_weekly_report(weekly_stats)
         weekly_file.write_text(str(now_ts))
