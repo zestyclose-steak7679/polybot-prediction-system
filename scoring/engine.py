@@ -66,6 +66,37 @@ def _spread_efficiency(yes_price: float, no_price: float) -> float:
     return float(np.clip(1.0 - spread / 0.08, 0.0, 1.0))
 
 
+def compute_confidence(signal, market_row, history_df) -> float:
+    """
+    Confidence = weighted combination of:
+    - History depth:     min(len(history_df) / 20, 1.0)      weight=0.30
+    - Volume consistency: 1 - (vol_std / (vol_mean + 1e-6))  weight=0.25
+    - Price stability:   1 - abs(one_day_change)              weight=0.25
+    - Edge margin:       min(signal.edge / 0.10, 1.0)         weight=0.20
+    All components clipped to [0.0, 1.0] before combining.
+    Returns float in [0.0, 1.0].
+    """
+    history_depth = min(len(history_df) / 20, 1.0)
+
+    if not history_df.empty and "volume" in history_df.columns:
+        vol_mean = history_df["volume"].mean()
+        vol_std = history_df["volume"].std()
+        vol_consistency = 1.0 - min(vol_std / (vol_mean + 1e-6), 1.0)
+    else:
+        vol_consistency = 0.3
+
+    price_stability = max(0.0, 1.0 - abs(market_row.get("one_day_change", 0.5)))
+    edge_margin = min(signal.edge / 0.10, 1.0)
+
+    confidence = (
+        0.30 * history_depth +
+        0.25 * vol_consistency +
+        0.25 * price_stability +
+        0.20 * edge_margin
+    )
+    return round(float(np.clip(confidence, 0.0, 1.0)), 4)
+
+
 # ── Main scoring ──────────────────────────────────────────────────────────────
 
 WEIGHTS = {

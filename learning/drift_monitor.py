@@ -16,6 +16,52 @@ logger = logging.getLogger(__name__)
 DRIFT_THRESHOLD = 0.30   # 30% change in feature mean triggers warning
 
 
+def compute_edge_decay(recent_window: int = 10, historical_window: int = 30) -> dict:
+    """
+    Compare recent CLV to historical CLV.
+    If recent_clv < historical_clv * 0.7 → edge decaying, reduce sizes.
+    Returns dict with decay_factor (0.5-1.0) and status string.
+    """
+    try:
+        from data.database import get_closed_bets
+        bets = get_closed_bets()
+        if len(bets) < recent_window + 5:
+            return {"decay_factor": 1.0, "status": "insufficient_data"}
+
+        bets_sorted = bets.sort_values("placed_at", ascending=False)
+        recent_clv = bets_sorted.head(recent_window)["clv"].mean()
+        historical_clv = bets_sorted.tail(historical_window)["clv"].mean()
+
+        if historical_clv <= 0:
+            return {"decay_factor": 1.0, "status": "no_historical_edge"}
+
+        ratio = recent_clv / (historical_clv + 1e-6)
+
+        if ratio < 0.5:
+            decay_factor = 0.5
+            status = "severe_decay"
+        elif ratio < 0.7:
+            decay_factor = 0.7
+            status = "moderate_decay"
+        elif ratio < 0.9:
+            decay_factor = 0.85
+            status = "mild_decay"
+        else:
+            decay_factor = 1.0
+            status = "healthy"
+
+        return {
+            "decay_factor": decay_factor,
+            "status": status,
+            "recent_clv": round(recent_clv, 4),
+            "historical_clv": round(historical_clv, 4),
+            "ratio": round(ratio, 4)
+        }
+    except Exception as e:
+        logger.error("Edge decay check failed: %s", e)
+        return {"decay_factor": 1.0, "status": "error"}
+
+
 def _load_snapshots(days: int = 7) -> pd.DataFrame:
     try:
         with sqlite3.connect(DB_PATH, uri=isinstance(DB_PATH, str) and DB_PATH.startswith("file:")) as con:

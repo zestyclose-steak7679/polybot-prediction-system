@@ -90,6 +90,15 @@ def init_db():
             trade_id INTEGER, market_id TEXT,
             features_json TEXT, snapshot_at TEXT
         );
+        CREATE TABLE IF NOT EXISTS clv_predictions (
+            market_id TEXT PRIMARY KEY,
+            entry_price REAL,
+            predicted_clv REAL,
+            signal_edge REAL,
+            strategy TEXT,
+            cycle_ts TEXT,
+            created_at TEXT
+        );
         CREATE TABLE IF NOT EXISTS alpha_signals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             cycle_ts TEXT NOT NULL,
@@ -348,12 +357,15 @@ def get_pnl_summary():
     wins = rows["result"].isin(["win", "timeout_win"])
     losses = rows["result"].isin(["loss", "timeout_loss"])
     clv_resolved = rows["clv"].notna()
+    total = len(rows)
+    wins_count = int(wins.sum())
+    win_rate = (wins_count / total * 100) if total > 0 else 0.0
     return {
-        "total_bets": len(rows),
-        "wins":       int(wins.sum()),
+        "total_bets": total,
+        "wins":       wins_count,
         "losses":     int(losses.sum()),
         "total_pnl":  round(rows["pnl"].sum(), 2),
-        "win_rate":   round(float(wins.mean())*100, 1),
+        "win_rate":   round(win_rate, 1),
         "roi":        round(rows["pnl"].sum()/staked*100, 2) if staked>0 else 0.0,
         "avg_clv":    round(rows["clv"].dropna().mean(), 4) if rows["clv"].notna().any() else None,
         "clv_resolved_bets": int(clv_resolved.sum()),
