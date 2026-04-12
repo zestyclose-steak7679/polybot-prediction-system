@@ -25,10 +25,13 @@ def compute_regime_features(price_series: np.ndarray, volume_series: np.ndarray 
 
     # Autocorrelation: +ve = trending, -ve = mean-reverting
     if len(returns) >= 2:
-        try:
-            autocorr = float(np.corrcoef(returns[:-1], returns[1:])[0, 1])
-        except Exception:
+        if np.std(returns[:-1]) == 0 or np.std(returns[1:]) == 0:
             autocorr = 0.0
+        else:
+            try:
+                autocorr = float(np.corrcoef(returns[:-1], returns[1:])[0, 1])
+            except Exception:
+                autocorr = 0.0
     else:
         autocorr = 0.0
     if np.isnan(autocorr):
@@ -36,14 +39,16 @@ def compute_regime_features(price_series: np.ndarray, volume_series: np.ndarray 
 
     # Volume spike
     if volume_series is not None and len(volume_series) >= 5:
-        vol_spike = float(volume_series[-1] / (np.mean(volume_series[-min(20,len(volume_series)):-1]) + 1e-6))
+        mean_vol = np.mean(volume_series[-min(20,len(volume_series)):-1]) + 1e-6
+        vol_spike = float(volume_series[-1] / mean_vol) if mean_vol != 0 else 0.0
     else:
         vol_spike = 1.0
 
     # Price range / normalised volatility
     mean_price = np.mean(price_series)
     if len(price_series) > 0:
-        price_range = float((np.max(price_series) - np.min(price_series)) / (mean_price + 1e-6))
+        denom = mean_price + 1e-6
+        price_range = float((np.max(price_series) - np.min(price_series)) / denom) if denom != 0 else 0.0
     else:
         price_range = 0.0
 

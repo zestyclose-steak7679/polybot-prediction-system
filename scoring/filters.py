@@ -39,3 +39,23 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     after = len(df)
     logger.info(f"Filters: {before} → {after} markets (dropped {before - after} markets due to filters)")
     return df.reset_index(drop=True)
+
+
+def apply_diversity_filter(df: pd.DataFrame, target_n: int = 100) -> pd.DataFrame:
+    """Ensure category diversity in market selection."""
+    if df.empty or "tags" not in df.columns:
+        return df.head(target_n)
+
+    sports = df[df["tags"].str.contains("sports|cricket|football|nba|nfl|ipl", case=False, na=False)]
+    politics = df[df["tags"].str.contains("politics|elections", case=False, na=False)]
+    crypto = df[df["tags"].str.contains("crypto|bitcoin|ethereum", case=False, na=False)]
+    other = df[~df.index.isin(sports.index) & ~df.index.isin(politics.index) & ~df.index.isin(crypto.index)]
+
+    selected = pd.concat([
+        sports.head(30),
+        politics.head(20),
+        crypto.head(20),
+        other.head(30)
+    ]).drop_duplicates(subset=["market_id"]).head(target_n)
+
+    return selected if len(selected) >= 10 else df.head(target_n)

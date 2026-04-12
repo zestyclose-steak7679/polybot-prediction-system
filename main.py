@@ -50,7 +50,7 @@ from data.markets         import fetch_markets
 from data.price_history   import log_prices, get_history, get_history_bulk, purge_old_history
 from data.features        import build_features
 from data.regime_features import compute_regime_features
-from scoring.filters      import apply_filters
+from scoring.filters      import apply_filters, apply_diversity_filter
 from scoring.strategies   import run_strategies
 from models.edge_model    import edge_model
 from models.clv_model     import clv_model
@@ -177,7 +177,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     if resolved_alpha:
         logger.info("Alpha outcomes resolved this cycle: %s", resolved_alpha)
     df = apply_filters(raw_df)
-    logger.info("Markets after filters: %s", len(df))
+    df = apply_diversity_filter(df)
+    logger.info("Markets after filters and diversity: %s", len(df))
     if df.empty:
         logger.warning("No markets passed filters")
         save_bankroll(bankroll)
@@ -429,6 +430,19 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         cycle_metrics["timeout_closed_this_cycle"],
         cycle_metrics["clv_resolved_this_cycle"],
         cycle_metrics["triggered_shadow_signals"],
+    )
+
+    logger.info(
+        "HEALTH | bankroll=$%.2f | bets=%s | win_rate=%.1f%% | avg_clv=%.4f | "
+        "signals_raw=%s | signals_executed=%s | regime=%s | model=%s",
+        bankroll,
+        cycle_metrics.get("total_bets", 0),
+        cycle_metrics.get("win_rate", 0.0),
+        clv.get("avg_clv", 0.0),
+        cycle_metrics["raw_signals"],
+        cycle_metrics["executed_trades"],
+        dom_regime,
+        mmode,
     )
 
     save_bankroll(bankroll)
