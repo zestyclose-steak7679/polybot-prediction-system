@@ -23,7 +23,9 @@ def log_predicted_clv(market_id: str, entry_price: float,
                        predicted_clv: float, signal_edge: float,
                        strategy: str, cycle_ts: str) -> None:
     """Log predicted CLV at bet placement time for later accuracy analysis."""
-    from data.database import _get_conn
+    import sqlite3
+import os as _os
+_DB_PATH = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "polybot.db")
     try:
         conn = _get_conn()
         conn.execute("""
