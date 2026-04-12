@@ -16,12 +16,41 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Restore state cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            polybot.db
+            bankroll.txt
+            peak_bankroll.txt
+            last_train.txt
+            killed_strategies.json
+            regime_state.json
+            models/edge_model.pkl
+            models/regime_kmeans.pkl
+          key: polybot-state-v1
+          restore-keys: polybot-state-v1
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
       - name: Run bot
         run: python main.py
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           BANKROLL: ${{ secrets.BANKROLL }}
+
+      - name: Save state cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            polybot.db
+            bankroll.txt
+            peak_bankroll.txt
+            last_train.txt
+            killed_strategies.json
+            regime_state.json
+            models/edge_model.pkl
+            models/regime_kmeans.pkl
+          key: polybot-state-v1

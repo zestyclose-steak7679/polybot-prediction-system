@@ -27,6 +27,15 @@ class AlphaSignal:
     passed_live_threshold: bool
 
 
+def _is_early_stage(min_bets: int = 30) -> bool:
+    try:
+        from data.database import get_closed_bets
+        bets = get_closed_bets()
+        return len(bets) < min_bets
+    except Exception:
+        return True
+
+
 def _bounded_quantile(values: list[float], q: float, default: float, low: float, high: float) -> float:
     if not values:
         return default
@@ -124,6 +133,9 @@ def _make_signal(row: pd.Series, alpha_name: str, score: float, predicted_clv: f
 
 
 def _late_drift_candidate(row: pd.Series, feats: dict, history: pd.DataFrame, thresholds: dict) -> dict:
+    if _is_early_stage():
+        thresholds = {k: v * 0.7 for k, v in thresholds.items() if isinstance(v, (int, float))}
+
     if history.empty or len(history) < 5:
         return {"passed": False, "reason": "insufficient_history", "score": 0.0, "predicted_clv": 0.0}
     if feats.get("near_resolution", 0) != 1:
@@ -168,6 +180,9 @@ def _late_drift_candidate(row: pd.Series, feats: dict, history: pd.DataFrame, th
 
 
 def _reversion_gap_candidate(row: pd.Series, feats: dict, history: pd.DataFrame, thresholds: dict) -> dict:
+    if _is_early_stage():
+        thresholds = {k: v * 0.7 for k, v in thresholds.items() if isinstance(v, (int, float))}
+
     if history.empty or len(history) < 5:
         return {"passed": False, "reason": "insufficient_history", "score": 0.0, "predicted_clv": 0.0}
 
@@ -208,6 +223,9 @@ def _reversion_gap_candidate(row: pd.Series, feats: dict, history: pd.DataFrame,
 
 
 def _spread_pressure_candidate(row: pd.Series, feats: dict, history: pd.DataFrame, thresholds: dict) -> dict:
+    if _is_early_stage():
+        thresholds = {k: v * 0.7 for k, v in thresholds.items() if isinstance(v, (int, float))}
+
     if history.empty or len(history) < 5:
         return {"passed": False, "reason": "insufficient_history", "score": 0.0, "predicted_clv": 0.0}
 
