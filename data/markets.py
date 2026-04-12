@@ -155,7 +155,7 @@ def fetch_markets(tags: list[str] = None) -> pd.DataFrame:
             break
 
         offset += MARKET_LIMIT
-        logger.info(f"Fetched {offset} markets so far...")
+        logger.info("Fetched %s markets so far...", len(all_markets))
 
     logger.info(f"Raw binary markets fetched: {raw_binary_count}")
     if not all_markets:

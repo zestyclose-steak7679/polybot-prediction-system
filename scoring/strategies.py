@@ -58,7 +58,13 @@ def momentum_strategy(row: Mapping[str, Any]) -> Signal | None:
 
     move = row["one_day_change"]   # positive = YES moved up
 
-    if abs(move) < MOMENTUM_THRESHOLD:
+    try:
+        from alpha.signals import _is_early_stage
+        threshold = MOMENTUM_THRESHOLD * 0.7 if _is_early_stage() else MOMENTUM_THRESHOLD
+    except Exception:
+        threshold = MOMENTUM_THRESHOLD
+
+    if abs(move) < threshold:
         return None
 
     if move > 0:
@@ -222,6 +228,14 @@ def run_strategies(df: pd.DataFrame, active: list[str]) -> list[Signal]:
     signals = []
     seen    = set()   # (market_id, side) pairs to avoid duplicate alerts
 
+    # Optional debug logging for momentum
+    try:
+        from alpha.signals import _is_early_stage
+        momentum_threshold = MOMENTUM_THRESHOLD * 0.7 if _is_early_stage() else MOMENTUM_THRESHOLD
+    except Exception:
+        momentum_threshold = MOMENTUM_THRESHOLD
+
+    momentum_count = 0
     for row in df.to_dict('records'):
         for name in active:
             fn = STRATEGY_MAP.get(name)
@@ -240,10 +254,16 @@ def run_strategies(df: pd.DataFrame, active: list[str]) -> list[Signal]:
             if key in seen:
                 continue
 
+            if name == "momentum":
+                momentum_count += 1
+
             seen.add(key)
             signals.append(sig)
 
     # Sort by edge descending
     signals.sort(key=lambda s: s.edge, reverse=True)
+    if "momentum" in active:
+        logger.debug("Momentum: evaluated %s markets, %s passed threshold %.3f",
+                     len(df), momentum_count, momentum_threshold)
     logger.info(f"Strategies produced {len(signals)} signals")
     return signals

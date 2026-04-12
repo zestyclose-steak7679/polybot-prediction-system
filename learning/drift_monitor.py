@@ -94,15 +94,15 @@ def compute_drift_multiplier() -> tuple[float, dict]:
     """
     df = _load_snapshots(days=7)
     if df.empty:
-        return 1.0, {}
+        return 1.0, {"status": "insufficient_data"}
 
     parsed = _parse_snapshots(df)
     if parsed.empty or len(parsed) < 10:
-        return 1.0, {}
+        return 1.0, {"status": "insufficient_data"}
 
     numeric = parsed.select_dtypes(include=[np.number])
     if numeric.empty:
-        return 1.0, {}
+        return 1.0, {"status": "insufficient_data"}
 
     numeric["snapshot_at"] = parsed["snapshot_at"]
     today_mask  = pd.to_datetime(numeric["snapshot_at"], utc=True) >= pd.Timestamp.utcnow() - pd.Timedelta(hours=24)
@@ -110,7 +110,7 @@ def compute_drift_multiplier() -> tuple[float, dict]:
     history_df  = numeric[~today_mask].drop(columns=["snapshot_at"])
 
     if today_df.empty or history_df.empty:
-        return 1.0, {}
+        return 1.0, {"status": "insufficient_data"}
 
     drift_report = {}
     n_drifted = 0
