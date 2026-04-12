@@ -23,17 +23,17 @@ def log_predicted_clv(market_id: str, entry_price: float,
                        predicted_clv: float, signal_edge: float,
                        strategy: str, cycle_ts: str) -> None:
     """Log predicted CLV at bet placement time for later accuracy analysis."""
-    from data.database import _get_conn
+    from data.database import _conn
     try:
-        conn = _get_conn()
-        conn.execute("""
-            INSERT OR REPLACE INTO clv_predictions
-            (market_id, entry_price, predicted_clv, signal_edge,
-             strategy, cycle_ts, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-        """, (market_id, entry_price, predicted_clv,
-              signal_edge, strategy, cycle_ts))
-        conn.commit()
+        with _conn() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO clv_predictions
+                (market_id, entry_price, predicted_clv, signal_edge,
+                 strategy, cycle_ts, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            """, (market_id, entry_price, predicted_clv,
+                  signal_edge, strategy, cycle_ts))
+            conn.commit()
     except Exception as e:
         logger.error("Failed to log predicted CLV: %s", e)
 
