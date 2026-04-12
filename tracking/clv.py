@@ -27,7 +27,8 @@ def log_predicted_clv(market_id: str, entry_price: float,
 import os as _os
 _DB_PATH = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "polybot.db")
     try:
-        conn = _get_conn()
+        conn = sqlite3.connect(_DB_PATH)
+
         conn.execute("""
             INSERT OR REPLACE INTO clv_predictions
             (market_id, entry_price, predicted_clv, signal_edge,
