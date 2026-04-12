@@ -457,8 +457,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         "HEALTH | bankroll=$%.2f | bets=%s | win_rate=%.1f%% | avg_clv=%.4f | "
         "signals_raw=%s | signals_executed=%s | regime=%s | model=%s",
         bankroll,
-        cycle_metrics.get("total_bets", 0),
-        cycle_metrics.get("win_rate", 0.0),
+        stats.get("total_bets", 0),
+        stats.get("win_rate", 0.0),
         clv.get("avg_clv", 0.0),
         cycle_metrics["raw_signals"],
         cycle_metrics["executed_trades"],
