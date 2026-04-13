@@ -35,6 +35,8 @@ def _is_early_stage(min_bets: int = 30) -> bool:
     except Exception:
         return True
 
+MIN_HISTORY_REQUIRED = 10 if _is_early_stage() else 20
+
 
 def _bounded_quantile(values: list[float], q: float, default: float, low: float, high: float) -> float:
     if not values:
@@ -71,7 +73,7 @@ def compute_alpha_thresholds(markets_df: pd.DataFrame, feature_map: dict, histor
         market_id = row["market_id"]
         feats = feature_map.get(market_id)
         history = history_lookup.get(market_id)
-        if not feats or history is None or history.empty or len(history) < 5:
+        if not feats or history is None or history.empty or len(history) < MIN_HISTORY_REQUIRED:
             continue
 
         late_vol_spike.append(float(feats.get("vol_spike_ratio", 1.0)))
@@ -136,7 +138,7 @@ def _late_drift_candidate(row: pd.Series, feats: dict, history: pd.DataFrame, th
     if _is_early_stage():
         thresholds = {k: v * 0.7 for k, v in thresholds.items() if isinstance(v, (int, float))}
 
-    if history.empty or len(history) < 5:
+    if history.empty or len(history) < MIN_HISTORY_REQUIRED:
         return {"passed": False, "reason": "insufficient_history", "score": 0.0, "predicted_clv": 0.0}
     if feats.get("near_resolution", 0) != 1:
         return {"passed": False, "reason": "not_near_resolution", "score": 0.0, "predicted_clv": 0.0}
@@ -183,7 +185,7 @@ def _reversion_gap_candidate(row: pd.Series, feats: dict, history: pd.DataFrame,
     if _is_early_stage():
         thresholds = {k: v * 0.7 for k, v in thresholds.items() if isinstance(v, (int, float))}
 
-    if history.empty or len(history) < 5:
+    if history.empty or len(history) < MIN_HISTORY_REQUIRED:
         return {"passed": False, "reason": "insufficient_history", "score": 0.0, "predicted_clv": 0.0}
 
     z_score = float(feats.get("z_score", 0.0))
@@ -226,7 +228,7 @@ def _spread_pressure_candidate(row: pd.Series, feats: dict, history: pd.DataFram
     if _is_early_stage():
         thresholds = {k: v * 0.7 for k, v in thresholds.items() if isinstance(v, (int, float))}
 
-    if history.empty or len(history) < 5:
+    if history.empty or len(history) < MIN_HISTORY_REQUIRED:
         return {"passed": False, "reason": "insufficient_history", "score": 0.0, "predicted_clv": 0.0}
 
     spread = abs(1.0 - float(row["yes_price"]) - float(row["no_price"]))
@@ -289,7 +291,7 @@ def diagnose_alpha_signals(markets_df: pd.DataFrame, feature_map: dict, history_
         market_id = row["market_id"]
         feats = feature_map.get(market_id)
         history = history_lookup.get(market_id)
-        if not feats or history is None or history.empty or len(history) < 5:
+        if not feats or history is None or history.empty or len(history) < MIN_HISTORY_REQUIRED:
             for alpha_name in diagnostics:
                 diagnostics[alpha_name]["failure_reasons"]["insufficient_history"] += 1
             continue
@@ -335,7 +337,7 @@ def build_alpha_signals(markets_df: pd.DataFrame, feature_map: dict, regime_map:
         market_id = row["market_id"]
         feats = feature_map.get(market_id)
         history = history_lookup.get(market_id)
-        if not feats or history is None or history.empty or len(history) < 5:
+        if not feats or history is None or history.empty or len(history) < MIN_HISTORY_REQUIRED:
             continue
 
         regime = regime_map.get(market_id, "neutral")

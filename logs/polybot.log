@@ -3528,3 +3528,5 @@
 2026-04-11 20:09:49,371 | INFO     | polybot.main | Alpha shadow leaders: reversion_gap=1.14865/n4 | late_drift=0.44893/n3
 2026-04-11 20:09:49,371 | INFO     | polybot.main | Cycle feedback | raw=6 enhanced=1 executed=1 blocked_threshold=5 blocked_risk=0 open=1 avg_hold=0.0h closed=2 timeout_closed=2 clv_closed=1 alpha_shadow=0
 2026-04-11 20:09:49,371 | INFO     | polybot.main | END | $1074.82 | alerts=1 | regime=illiquid_spike | H/CLV-/META-
+2026-04-13 12:47:39,553 | INFO     | models.regime_model | Loaded KMeans regime model.
+2026-04-13 13:05:37,626 | INFO     | models.regime_model | Loaded KMeans regime model.
