@@ -26,7 +26,7 @@ def compute_edge_decay(recent_window: int = 10, historical_window: int = 30) -> 
         from data.database import get_closed_bets
         bets = get_closed_bets()
         if len(bets) < recent_window + 5:
-            return 1.0, {"status": "insufficient_data"}
+            return {"decay_factor": 1.0, "status": "insufficient_data"}
 
         bets_sorted = bets.sort_values("placed_at", ascending=False)
         recent_clv = bets_sorted.head(recent_window)["clv"].mean()
