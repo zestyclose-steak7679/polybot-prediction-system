@@ -500,8 +500,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     save_bankroll(bankroll)
 
-    from learning.benchmarks import update_benchmarks, check_benchmarks
-    from alerts.telegram import send_benchmark_alert
+    from learning.benchmarks import update_benchmarks, check_benchmarks, send_benchmark_alert
     benchmark_data = update_benchmarks(
         signals=cycle_metrics["raw_signals"],
         bets=cycle_metrics["executed_trades"],
