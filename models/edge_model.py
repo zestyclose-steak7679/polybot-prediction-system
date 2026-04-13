@@ -22,7 +22,9 @@ Don't trust an untrained model with real capital.
 import numpy as np
 import pandas as pd
 import sqlite3
+<<<<<< main-7212495865877135481
 import pickle
+>>>>>> main
 import logging
 from pathlib import Path
 from config import DB_PATH
