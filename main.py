@@ -162,7 +162,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     run_if_due(edge_model, clv_model, meta_model)
 
     # 4. Feature drift check
-    drift_mult, _ = compute_drift_multiplier()
+    drift_result = compute_drift_multiplier()
+    drift_mult = drift_result[0] if isinstance(drift_result, tuple) else float(drift_result)
     if drift_mult < 1.0:
         logger.warning(f"Feature drift detected → size multiplier {drift_mult:.2f}")
 
@@ -335,8 +336,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     # 12. Drawdown + drift multipliers
     dd_mult, dd_status = get_size_multiplier(bankroll)
-    decay_raw = compute_edge_decay()
-    decay = decay_raw if isinstance(decay_raw, dict) else {"decay_factor": 1.0, "status": "ok"}
+    decay_result = compute_edge_decay()
+    decay = decay_result if isinstance(decay_result, dict) else (decay_result[1] if isinstance(decay_result, tuple) and len(decay_result) > 1 else {"decay_factor": 1.0, "status": "ok"})
     total_mult = dd_mult * drift_mult * decay["decay_factor"]
     logger.info(
         "Size multipliers: DD=%.2f Drift=%.2f Decay=%.2f Total=%.2f | Decay status: %s",
