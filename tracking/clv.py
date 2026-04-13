@@ -25,20 +25,36 @@ def _utc_now() -> datetime:
 def log_predicted_clv(market_id: str, entry_price: float,
                        predicted_clv: float, signal_edge: float,
                        strategy: str, cycle_ts: str) -> None:
-    """Log predicted CLV at bet placement time for later accuracy analysis."""
     try:
-        conn = sqlite3.connect(_DB_PATH)
-
+        import sqlite3, os
+        db_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "polybot.db"
+        )
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA journal_mode=MEMORY")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS clv_predictions (
+                market_id TEXT PRIMARY KEY,
+                entry_price REAL,
+                predicted_clv REAL,
+                signal_edge REAL,
+                strategy TEXT,
+                cycle_ts TEXT,
+                created_at TEXT
+            )
+        """)
         conn.execute("""
             INSERT OR REPLACE INTO clv_predictions
             (market_id, entry_price, predicted_clv, signal_edge,
              strategy, cycle_ts, created_at)
             VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-        """, (market_id, entry_price, predicted_clv,
-              signal_edge, strategy, cycle_ts))
+        """, (market_id, float(entry_price), float(predicted_clv),
+              float(signal_edge), str(strategy), str(cycle_ts)))
         conn.commit()
+        conn.close()
     except Exception as e:
-        logger.error("Failed to log predicted CLV: %s", e)
+        logger.error("log_predicted_clv failed (non-fatal): %s", e)
 
 
 def compute_clv(entry_price: float, closing_price: float, direction: int) -> float | None:

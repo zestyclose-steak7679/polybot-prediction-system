@@ -24,6 +24,7 @@ from config import (
     REVERSAL_THRESHOLD,
     VOLUME_SPIKE_RATIO,
     EDGE_THRESHOLD,
+    MIN_VOLUME,
 )
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,11 @@ def momentum_strategy(row: Mapping[str, Any]) -> Signal | None:
 
     edge = confidence - price
     if edge < EDGE_THRESHOLD:
-        return None
+        if row.get("one_day_change", 0) > 0.03 and row.get("volume", 0) > MIN_VOLUME:
+            confidence = min(price + EDGE_THRESHOLD, 0.95)
+            edge = EDGE_THRESHOLD
+        else:
+            return None
 
     return Signal(
         strategy     = "momentum",
@@ -186,7 +191,11 @@ def volume_spike_strategy(row: Mapping[str, Any]) -> Signal | None:
     edge       = confidence - price
 
     if edge < EDGE_THRESHOLD:
-        return None
+        if row.get("one_day_change", 0) > 0.03 and row.get("volume", 0) > MIN_VOLUME:
+            confidence = min(price + EDGE_THRESHOLD, 0.95)
+            edge = EDGE_THRESHOLD
+        else:
+            return None
 
     return Signal(
         strategy     = "volume_spike",

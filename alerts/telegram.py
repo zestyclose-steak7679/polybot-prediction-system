@@ -15,10 +15,29 @@ SESSION.trust_env = False
 
 
 def _get_credentials():
-    import os
-    token = os.environ.get("TELEGRAM_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
+    token = (os.environ.get("TELEGRAM_TOKEN") or
+             os.environ.get("TELEGRAM_BOT_TOKEN") or "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID") or ""
     return token.strip(), chat_id.strip()
+
+def _send(text: str) -> bool:
+    token, chat_id = _get_credentials()
+    if not token or not chat_id:
+        logger.warning("Telegram token or chat ID is missing, skipping alert.")
+        return False
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            timeout=10
+        )
+        if not resp.ok:
+            logger.error("Telegram API error: %s %s", resp.status_code, resp.text[:200])
+            return False
+        return True
+    except Exception as e:
+        logger.error("Telegram send exception: %s", e)
+        return False
 
 
 def _utc_now() -> datetime:
@@ -64,20 +83,9 @@ def send_pick_alert(pick: dict, bankroll: float):
         f"⚠️ Paper trade only."
     )
 
-    telegram_api = f"https://api.telegram.org/bot{token}"
-    try:
-        if len(text) > 4096:
-            text = text[:4093] + "..."
-        resp = SESSION.post(
-            f"{telegram_api}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        return True
-    except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return False
+    if len(text) > 4096:
+        text = text[:4093] + "..."
+    return _send(text)
 
 
 def _fmt_optional_float(value, digits: int = 4, suffix: str = "") -> str:
@@ -163,20 +171,9 @@ def send_summary(
         f"{'─' * 28}"
     )
 
-    telegram_api = f"https://api.telegram.org/bot{token}"
-    try:
-        if len(text) > 4096:
-            text = text[:4093] + "..."
-        resp = SESSION.post(
-            f"{telegram_api}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        return True
-    except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return False
+    if len(text) > 4096:
+        text = text[:4093] + "..."
+    return _send(text)
 
 
 def send_risk_halt(reason: str, bankroll: float):
@@ -186,18 +183,7 @@ def send_risk_halt(reason: str, bankroll: float):
         return
     text = f"🛑 RISK HALT\n\n{reason}\n\n💰 Bankroll: ${bankroll:.2f}"
 
-    telegram_api = f"https://api.telegram.org/bot{token}"
-    try:
-        resp = SESSION.post(
-            f"{telegram_api}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        return True
-    except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return False
+    return _send(text)
 
 
 def send_startup(bankroll: float):
@@ -207,18 +193,7 @@ def send_startup(bankroll: float):
         return
     text = f"🚀 Polybot started\n💰 Bankroll: ${bankroll:.2f}"
 
-    telegram_api = f"https://api.telegram.org/bot{token}"
-    try:
-        resp = SESSION.post(
-            f"{telegram_api}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        return True
-    except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return False
+    return _send(text)
 
 
 def send_error(msg: str):
@@ -228,20 +203,9 @@ def send_error(msg: str):
         return
     text = f"❌ ERROR\n\n{msg}"
 
-    telegram_api = f"https://api.telegram.org/bot{token}"
-    try:
-        if len(text) > 4096:
-            text = text[:4093] + "..."
-        resp = SESSION.post(
-            f"{telegram_api}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        return True
-    except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return False
+    if len(text) > 4096:
+        text = text[:4093] + "..."
+    return _send(text)
 
 
 def send_weekly_report(stats: dict) -> None:

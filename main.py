@@ -194,26 +194,31 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     # 7-8. Features + regime per market
     feature_map, history_map, regime_map, regime_vecs = {}, {}, {}, []
 
+    from alpha.signals import MIN_HISTORY_REQUIRED
     market_ids = df["market_id"].tolist()
-    bulk_history = get_history_bulk(market_ids, last_n=20)
+    bulk_history = get_history_bulk(market_ids, last_n=MIN_HISTORY_REQUIRED)
 
     for row in df.to_dict("records"):
-        mid     = row["market_id"]
-        history = bulk_history.get(mid, pd.DataFrame())
-        feats   = build_features(row, history)
-        if not feats:
+        try:
+            mid     = row["market_id"]
+            history = bulk_history.get(mid, pd.DataFrame())
+            feats   = build_features(row, history)
+            if not feats:
+                continue
+            feature_map[mid] = feats
+            history_map[mid] = history
+            prices  = history["yes_price"].values if not history.empty else np.array([])
+            volumes = history["volume"].values if not history.empty and "volume" in history.columns else np.array([])
+            rf      = compute_regime_features(prices, volumes)
+            raw_regime   = regime_model.predict(rf)
+            stable_regime = get_stable_regime(raw_regime)   # 3-cycle confirmation
+            regime_map[mid] = stable_regime
+            regime_vecs.append([rf["volatility"], rf["trend_strength"],
+                                 rf["autocorr"],   rf["vol_spike"],
+                                 rf["price_range"]])
+        except Exception as e:
+            logger.warning("Market %s skipped due to error: %s", row.get("market_id", "?"), e)
             continue
-        feature_map[mid] = feats
-        history_map[mid] = history
-        prices  = history["yes_price"].values if not history.empty else np.array([])
-        volumes = history["volume"].values if not history.empty and "volume" in history.columns else np.array([])
-        rf      = compute_regime_features(prices, volumes)
-        raw_regime   = regime_model.predict(rf)
-        stable_regime = get_stable_regime(raw_regime)   # 3-cycle confirmation
-        regime_map[mid] = stable_regime
-        regime_vecs.append([rf["volatility"], rf["trend_strength"],
-                             rf["autocorr"],   rf["vol_spike"],
-                             rf["price_range"]])
 
     logger.info(f"Markets with sufficient history: {len(feature_map)}")
     if not feature_map:
@@ -287,47 +292,51 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     enhanced = []
 
     for sig in signals:
-        feats = feature_map.get(sig.market_id)
-        if not feats:
+        try:
+            feats = feature_map.get(sig.market_id)
+            if not feats:
+                continue
+
+            market_row = df[df["market_id"] == sig.market_id].iloc[0] if not df.empty else pd.Series()
+            history_df = get_history(sig.market_id) if sig.market_id in [s.market_id for s in signals] else pd.DataFrame()
+            sig.confidence = compute_confidence(sig, market_row, history_df)
+
+            model_feats = {
+                **feats,
+                "price": sig.price, "edge_est": sig.edge,
+                "confidence": sig.confidence,
+                "liquidity": sig.liquidity, "volume": sig.volume,
+                "one_day_change": sig.one_day_change,
+            }
+
+            equal_weight = 1 / max(len(routed), 1)
+            meta_w   = meta_model.predict_weights(model_feats, routed) if meta_weight_active else {name: equal_weight for name in routed}
+            sw       = sharpe_weights.get(sig.strategy, equal_weight) if weight_gate["active"] else equal_weight
+            clv_pred = clv_model.predict(model_feats)
+
+            ep = edge_model.predict_prob(feats)
+            if ep != sig.price:
+                sig.confidence = round(ep, 4)
+                sig.edge       = round(ep - sig.price, 4)
+
+            mw = meta_w.get(sig.strategy, 1/max(len(routed),1))
+            if clv_model.is_trained:
+                combined = (0.45 * sig.edge
+                            + 0.30 * clv_pred
+                            + 0.15 * mw * sig.edge
+                            + 0.10 * sw * sig.edge)
+            else:
+
+                combined = (0.60 * sig.edge
+                            + 0.25 * mw * sig.edge
+                            + 0.15 * sw * sig.edge)
+            sig.edge = round(combined, 4)
+
+            if sig.edge >= EDGE_THRESHOLD:
+                enhanced.append(sig)
+        except Exception as e:
+            logger.warning("Signal %s skipped during enhancement: %s", sig.market_id, e)
             continue
-
-        market_row = df[df["market_id"] == sig.market_id].iloc[0] if not df.empty else pd.Series()
-        history_df = get_history(sig.market_id) if sig.market_id in [s.market_id for s in signals] else pd.DataFrame()
-        sig.confidence = compute_confidence(sig, market_row, history_df)
-
-        model_feats = {
-            **feats,
-            "price": sig.price, "edge_est": sig.edge,
-            "confidence": sig.confidence,
-            "liquidity": sig.liquidity, "volume": sig.volume,
-            "one_day_change": sig.one_day_change,
-        }
-
-        equal_weight = 1 / max(len(routed), 1)
-        meta_w   = meta_model.predict_weights(model_feats, routed) if meta_weight_active else {name: equal_weight for name in routed}
-        sw       = sharpe_weights.get(sig.strategy, equal_weight) if weight_gate["active"] else equal_weight
-        clv_pred = clv_model.predict(model_feats)
-
-        ep = edge_model.predict_prob(feats)
-        if ep != sig.price:
-            sig.confidence = round(ep, 4)
-            sig.edge       = round(ep - sig.price, 4)
-
-        mw = meta_w.get(sig.strategy, 1/max(len(routed),1))
-        if clv_model.is_trained:
-            combined = (0.45 * sig.edge
-                        + 0.30 * clv_pred
-                        + 0.15 * mw * sig.edge
-                        + 0.10 * sw * sig.edge)
-        else:
-
-            combined = (0.60 * sig.edge
-                        + 0.25 * mw * sig.edge
-                        + 0.15 * sw * sig.edge)
-        sig.edge = round(combined, 4)
-
-        if sig.edge >= EDGE_THRESHOLD:
-            enhanced.append(sig)
 
     avg_enhanced_edge = float(np.mean([sig.edge for sig in enhanced])) if enhanced else 0.0
     cycle_metrics["enhanced_signals"] = len(enhanced)
@@ -508,23 +517,50 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     return bankroll
 
 
+def preflight_check() -> bool:
+    """Validate all critical components before starting cycle."""
+    ok = True
+
+    # Check Telegram
+    token = os.environ.get("TELEGRAM_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID") or ""
+    if not token or not chat_id:
+        logger.error("PREFLIGHT FAIL: Telegram credentials missing")
+        ok = False
+    else:
+        logger.info("PREFLIGHT OK: Telegram credentials present (token: %s...)", token[:8])
+
+    # Check bankroll
+    try:
+        bankroll = load_bankroll()
+        logger.info("PREFLIGHT OK: Bankroll $%.2f", bankroll)
+    except Exception as e:
+        logger.error("PREFLIGHT FAIL: Bankroll load error: %s", e)
+        ok = False
+
+    # Check database path accessible
+    try:
+        init_db()
+        logger.info("PREFLIGHT OK: Database initialised")
+    except Exception as e:
+        logger.error("PREFLIGHT FAIL: Database error: %s", e)
+        ok = False
+
+    return ok
+
 def main():
+    if not preflight_check():
+        logger.error("Preflight failed — exiting")
+        sys.exit(1)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--loop",     action="store_true")
     parser.add_argument("--backtest", action="store_true")
     args = parser.parse_args()
 
-    token = os.environ.get("TELEGRAM_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
-    if not token or not chat_id:
-        logger.error("STARTUP ERROR: TELEGRAM_TOKEN or TELEGRAM_CHAT_ID not set. Alerts will not send.")
-    else:
-        logger.info("Telegram credentials loaded OK. Token prefix: %s... Chat: %s", token[:8], chat_id)
-
     if not Path("polybot.db").exists():
         open("polybot.db", "w").close()
 
-    init_db()
     from data.price_history import init_price_history  
     init_price_history()                               
     bankroll = load_bankroll()
