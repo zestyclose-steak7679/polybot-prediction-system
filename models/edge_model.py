@@ -22,7 +22,6 @@ Don't trust an untrained model with real capital.
 import numpy as np
 import pandas as pd
 import sqlite3
-import skops.io as sio
 import logging
 from pathlib import Path
 from config import DB_PATH
