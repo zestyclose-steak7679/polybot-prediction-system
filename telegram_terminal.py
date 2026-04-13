@@ -1,6 +1,3 @@
-"""
-telegram_terminal.py
-====================
 Live portfolio terminal for Polybot, delivered via Telegram.
 
 Integrates directly with existing polybot modules — no new dependencies.

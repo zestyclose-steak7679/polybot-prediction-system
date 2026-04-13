@@ -236,3 +236,60 @@ def send_weekly_report(stats: dict) -> None:
                                  "parse_mode": "HTML"}, timeout=10)
     except Exception as e:
         logger.error("Weekly report send failed: %s", e)
+
+def send_positions_update(positions_df) -> None:
+    """Send current open positions to Telegram."""
+    token, chat_id = _get_credentials()
+    if not token or not chat_id:
+        return
+    if positions_df.empty:
+        msg = "📭 <b>OPEN POSITIONS</b>\n\nNo open positions."
+    else:
+        lines = ["📊 <b>OPEN POSITIONS</b>\n"]
+        total_unrealised = 0.0
+        for _, row in positions_df.iterrows():
+            pnl = row.get("unrealised_pnl", 0.0) or 0.0
+            total_unrealised += pnl
+            pnl_str = f"+${pnl:.2f}" if pnl >= 0 else f"-${abs(pnl):.2f}"
+            lines.append(
+                f"{'🟢' if pnl >= 0 else '🔴'} {str(row['question'])[:45]}\n"
+                f"   {row['side']} @ {row['entry_price']:.3f} | "
+                f"Hold: {row['hold_hours']:.1f}h | P&L: {pnl_str}\n"
+                f"   Strategy: {row['strategy']} | Size: ${row['bet_size']:.2f}"
+            )
+        total_str = f"+${total_unrealised:.2f}" if total_unrealised >= 0 else f"-${abs(total_unrealised):.2f}"
+        lines.append(f"\n💼 Total unrealised: <b>{total_str}</b>")
+        msg = "\n".join(lines)
+    _send(msg)
+
+def send_benchmark_alert(violations: list, data: dict, bankroll: float) -> None:
+    """Send benchmark violation alert to Telegram."""
+    token, chat_id = _get_credentials()
+    if not token or not chat_id or not violations:
+        return
+
+    lines = [
+        "🚨 <b>DAILY BENCHMARK ALERT</b>",
+        f"📅 {data.get('date', 'unknown')}",
+        "─" * 28,
+        ""
+    ]
+
+    for v in violations:
+        lines.append(
+            f"{v['severity']} <b>{v['metric']}</b>\n"
+            f"   Expected: {v['expected']}\n"
+            f"   Actual: {v['actual']}"
+        )
+
+    lines.extend([
+        "",
+        "─" * 28,
+        f"📊 Today's signals: {data.get('signals_today', 0)}",
+        f"🎯 Today's bets: {data.get('bets_today', 0)}",
+        f"💰 Bankroll: ${bankroll:.2f}",
+        "",
+        "⚡ Bot needs attention."
+    ])
+
+    _send("\n".join(lines))
