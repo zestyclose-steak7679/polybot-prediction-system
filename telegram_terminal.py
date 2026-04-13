@@ -1,31 +1,24 @@
+"""
 Live portfolio terminal for Polybot, delivered via Telegram.
 
-Integrates directly with existing polybot modules — no new dependencies.
+Integrates directly with existing polybot modules - no new dependencies.
 Reads from polybot.db (paper_bets, alpha_signals) and live state files.
 
 COMMANDS
-  /terminal   → send live dashboard, starts auto-refresh every 30s
-  /stop       → stop auto-refresh
-  /positions  → open bets table
-  /history    → last 20 closed bets
-  /strategies → per-strategy ROI + CLV breakdown
-  /clv        → CLV significance report
-  /risk       → risk controls status
+  /terminal   -> send live dashboard, starts auto-refresh every 30s
+  /stop       -> stop auto-refresh
+  /positions  -> open bets table
+  /history    -> last 20 closed bets
+  /strategies -> per-strategy ROI + CLV breakdown
+  /clv        -> CLV significance report
+  /risk       -> risk controls status
 
 SETUP
   1. pip install python-telegram-bot>=20.0
   2. Set TELEGRAM_TOKEN and TELEGRAM_CHAT_ID in env (already in config.py)
   3. Run alongside main.py:  python telegram_terminal.py
   4. In Telegram: /terminal to start live view
-
-DESIGN CHOICES vs the generic advice you received
-  - text-based tables (tabulate), NOT images — faster, no matplotlib dep,
-    works in groups, searchable in chat history
-  - edit_message_text loop (30s) — single pinned message, no notification spam
-  - reads directly from sqlite — no API roundtrip, always current
-  - no py-polymarket-clob dep — you already have data.markets + data.database
 """
-
 import asyncio
 import logging
 import math
@@ -90,7 +83,7 @@ def _usd(val: float | None) -> str:
 
 def _clv_str(val: float | None) -> str:
     if val is None:
-        return "—"
+        return "-"
     return f"{val:+.4f}"
 
 
@@ -128,7 +121,7 @@ def _build_summary() -> str:
         f"<b>POLYBOT TERMINAL</b>",
         f"<code>{_now()}</code>",
         "",
-        f"<b>Goal: ₹1k → ₹30k</b>",
+        f"<b>Goal: ₹1k -> ₹30k</b>",
         f"<code>[{bar}] {progress_pct*100:.1f}%</code>",
         "",
         "<b>Portfolio</b>",
@@ -261,7 +254,7 @@ def _build_strategies() -> str:
 def _build_clv_report() -> str:
     """
     Honest CLV significance report.
-    clv = (1/entry_price) - (1/closing_price) — not model_edge.
+    clv = (1/entry_price) - (1/closing_price) - not model_edge.
     """
     clv = clv_report()
     n = clv["n"]
@@ -441,7 +434,7 @@ async def cmd_risk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Handle inline keyboard buttons — update the existing message."""
+    """Handle inline keyboard buttons - update the existing message."""
     query = update.callback_query
     await query.answer()
 

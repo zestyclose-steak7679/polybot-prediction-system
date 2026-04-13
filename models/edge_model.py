@@ -22,6 +22,9 @@ Don't trust an untrained model with real capital.
 import numpy as np
 import pandas as pd
 import sqlite3
+<<<<<< main-7212495865877135481
+import pickle
+>>>>>> main
 import logging
 from pathlib import Path
 from config import DB_PATH
@@ -93,7 +96,7 @@ class EdgeModel:
         if Path(MODEL_PATH).exists():
             try:
                 with open(MODEL_PATH, "rb") as f:
-                    self.model      = sio.load(f, trusted=['sklearn._loss.link.Interval', 'sklearn._loss.link.LogitLink', 'sklearn._loss.loss.HalfBinomialLoss'])
+                    self.model      = pickle.load(f)
                     self.is_trained = True
                 logger.info("Loaded trained edge model from disk.")
             except Exception as e:
@@ -102,7 +105,7 @@ class EdgeModel:
     def _save(self):
         Path(MODEL_PATH).parent.mkdir(exist_ok=True)
         with open(MODEL_PATH, "wb") as f:
-            sio.dump(self.model, f)
+            pickle.dump(self.model, f)
         logger.info("Edge model saved.")
 
     def should_train(self) -> bool:

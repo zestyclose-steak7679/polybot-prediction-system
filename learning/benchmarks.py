@@ -145,3 +145,36 @@ def check_benchmarks(data: dict, clv_stats: dict,
         })
 
     return violations
+
+def send_benchmark_alert(violations: list, data: dict, bankroll: float) -> None:
+    """Send benchmark violation alert to Telegram."""
+    from alerts.telegram import _get_credentials, _send
+    token, chat_id = _get_credentials()
+    if not token or not chat_id or not violations:
+        return
+
+    lines = [
+        "🚨 <b>DAILY BENCHMARK ALERT</b>",
+        f"📅 {data.get('date', 'unknown')}",
+        "─" * 28,
+        ""
+    ]
+
+    for v in violations:
+        lines.append(
+            f"{v['severity']} <b>{v['metric']}</b>\n"
+            f"   Expected: {v['expected']}\n"
+            f"   Actual: {v['actual']}"
+        )
+
+    lines.extend([
+        "",
+        "─" * 28,
+        f"📊 Today's signals: {data.get('signals_today', 0)}",
+        f"🎯 Today's bets: {data.get('bets_today', 0)}",
+        f"💰 Bankroll: ${bankroll:.2f}",
+        "",
+        "⚡ Bot needs attention."
+    ])
+
+    _send("\n".join(lines))
