@@ -335,7 +335,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     # 12. Drawdown + drift multipliers
     dd_mult, dd_status = get_size_multiplier(bankroll)
-    decay = compute_edge_decay()
+    decay_raw = compute_edge_decay()
+    decay = decay_raw if isinstance(decay_raw, dict) else {"decay_factor": 1.0, "status": "ok"}
     total_mult = dd_mult * drift_mult * decay["decay_factor"]
     logger.info(
         "Size multipliers: DD=%.2f Drift=%.2f Decay=%.2f Total=%.2f | Decay status: %s",
