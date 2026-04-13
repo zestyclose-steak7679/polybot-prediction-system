@@ -22,7 +22,7 @@ MAX_DRAWDOWN_PCT  = 0.20  # halt all betting if bankroll drops 20% from peak
 MIN_BETS_TO_EVAL  = 10    # don't judge a strategy until it has 10 bets
 STRATEGY_MIN_ROI  = -0.05 # disable strategy if ROI drops below -5%
 MAX_OPEN_BETS     = 8     # max simultaneous paper bets
-MAX_POSITION_AGE_HOURS = 6  # recycle paper capital from stale positions
+MAX_POSITION_AGE_HOURS = 48  # recycle paper capital from stale positions
 
 # ── Market filters ────────────────────────────────────────
 MIN_LIQUIDITY    = 500    # minimum $500 liquidity

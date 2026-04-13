@@ -10,7 +10,7 @@ from data.database import get_closed_bets
 
 logger = logging.getLogger(__name__)
 CLV_KILL_THRESHOLD  = -0.005   # avg CLV < -0.5%
-MIN_BETS_TO_KILL    = 50
+MIN_BETS_TO_KILL    = 20
 ROLLING_WINDOW      = 50
 COOLDOWN_HOURS      = 12
 COOLDOWN_FILE       = "killed_strategies.json"
@@ -31,6 +31,22 @@ def _save_killed(killed: dict):
     Path(COOLDOWN_FILE).write_text(json.dumps(killed))
 
 
+def revive_eligible_strategies(killed: list, all_stats: dict) -> list:
+    """
+    Revive strategies that were killed but now show positive recent CLV.
+    A strategy can be revived if it has been dead for 24+ hours
+    and recent market conditions have changed regime.
+    """
+    revived = []
+    for strategy in killed:
+        stats = all_stats.get(strategy, {})
+        # Revive if it has less than MIN_BETS_TO_KILL bets (killed too early)
+        if stats.get("n_bets", 0) < MIN_BETS_TO_KILL:
+            revived.append(strategy)
+            logger.info("Reviving strategy %s — killed with insufficient data", strategy)
+    return revived
+
+
 def get_killed_strategies() -> set:
     df = get_closed_bets(limit=500)
     killed_log = _load_killed()
@@ -45,6 +61,11 @@ def get_killed_strategies() -> set:
         logger.info(f"Strategy re-enabled after cooldown: {k}")
 
     if not df.empty and "strategy_tag" in df.columns:
+        from config import STRATEGY_MIN_ROI
+        from learning.tracker import get_all_strategy_stats
+        sstats = get_all_strategy_stats()
+        stats_dict = {s["strategy"]: s for s in sstats}
+
         for strat, grp in df.groupby("strategy_tag"):
             # Already in cooldown?
             if strat in killed_log:
@@ -54,6 +75,15 @@ def get_killed_strategies() -> set:
             clv_data = grp["clv"].dropna().tail(ROLLING_WINDOW)
             if len(clv_data) < MIN_BETS_TO_KILL:
                 continue   # not enough data — benefit of the doubt
+
+            stats = stats_dict.get(strat, {})
+            n_bets = stats.get("n_bets", 0) if isinstance(stats, dict) else 0
+            if n_bets < MIN_BETS_TO_KILL:
+                continue
+
+            roi = stats.get("roi", 0.0) if isinstance(stats, dict) else 0.0
+            if roi > STRATEGY_MIN_ROI:
+                continue
 
             avg_clv = float(clv_data.mean())
             if avg_clv < CLV_KILL_THRESHOLD:

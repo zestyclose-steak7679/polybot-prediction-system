@@ -1,31 +1,27 @@
-@@ -1,25 +1,12 @@
-__pycache__/
-<<<<<< main-2750375218994372408
-*.pyc
-logs/
+# Runtime databases
 *.db
 *.db-journal
+
+# Runtime state
 bankroll.txt
 peak_bankroll.txt
 last_train.txt
 regime_state.json
 killed_strategies.json
-=======
-*.py[cod]
-*$py.class
-.pytest_cache/
-.unittest_cache/
-*.db
-*.db-journal
-*.log
-bankroll.txt
-last_train.txt
-peak_bankroll.txt
-killed_strategies.json
-regime_state.json
->>>>>> main
+daily_benchmarks.json
 20.0
 file
+
+# Logs and models
 logs/
 models/*.pkl
+
+# Python
 __pycache__/
+*.pyc
+*.pyo
+
+# Jules artifacts
+commit_helper.sh
+plan.md
+test_task4.py

@@ -119,6 +119,28 @@ def init_db():
             resolution_state TEXT,
             resolved_at TEXT
         );
+        CREATE TABLE IF NOT EXISTS trade_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            market_id TEXT NOT NULL,
+            question TEXT,
+            strategy TEXT,
+            side TEXT,
+            entry_price REAL,
+            exit_price REAL,
+            bet_size REAL,
+            pnl REAL,
+            roi_pct REAL,
+            clv REAL,
+            edge_at_entry REAL,
+            confidence REAL,
+            regime TEXT,
+            placed_at TEXT,
+            closed_at TEXT,
+            close_reason TEXT,
+            hold_hours REAL,
+            bankroll_at_entry REAL,
+            bankroll_at_exit REAL
+        );
         CREATE INDEX IF NOT EXISTS idx_pb_strategy ON paper_bets(strategy_tag);
         CREATE INDEX IF NOT EXISTS idx_pb_result ON paper_bets(result);
         CREATE INDEX IF NOT EXISTS idx_alpha_market ON alpha_signals(market_id, cycle_ts);
@@ -383,3 +405,75 @@ def log_market(market_id, question, yes_price, liquidity, volume,
              one_day_change, strategy, signal_edge, regime,
              _utc_now().isoformat()))
         con.commit()
+
+def record_trade_close(market_id: str, exit_price: float,
+                        pnl: float, close_reason: str,
+                        bankroll_at_exit: float) -> None:
+    """Record trade closure to history."""
+    try:
+        with _conn() as conn:
+            conn.execute("""
+                UPDATE trade_history
+                SET exit_price=?, pnl=?,
+                    roi_pct=ROUND((? / bet_size) * 100, 2),
+                    closed_at=datetime('now'),
+                    close_reason=?,
+                    hold_hours=ROUND((julianday('now') - julianday(placed_at)) * 24, 2),
+                    bankroll_at_exit=?
+                WHERE market_id=? AND closed_at IS NULL
+            """, (exit_price, pnl, pnl, close_reason, bankroll_at_exit, market_id))
+    except Exception as e:
+        logger.error("record_trade_close failed: %s", e)
+
+def get_trade_history(limit: int = 50) -> pd.DataFrame:
+    """Get full trade history sorted by most recent."""
+    try:
+        with _conn() as conn:
+            return pd.read_sql("""
+                SELECT market_id, question, strategy, side,
+                       entry_price, exit_price, bet_size, pnl,
+                       roi_pct, clv, regime, placed_at, closed_at,
+                       close_reason, hold_hours
+                FROM trade_history
+                ORDER BY placed_at DESC
+                LIMIT ?
+            """, conn, params=(limit,))
+    except Exception as e:
+        logger.error("get_trade_history failed: %s", e)
+        return pd.DataFrame()
+
+def get_open_positions_detail() -> pd.DataFrame:
+    """Get all open positions with current market context."""
+    try:
+        with _conn() as conn:
+            return pd.read_sql("""
+                SELECT
+                    pb.market_id,
+                    pb.question,
+                    pb.strategy_tag as strategy,
+                    pb.side,
+                    pb.entry_price,
+                    pb.bet_size,
+                    pb.edge_est,
+                    pb.confidence,
+                    pb.placed_at,
+                    ROUND((julianday('now') - julianday(pb.placed_at)) * 24, 1) as hold_hours,
+                    ph.yes_price as current_price,
+                    ROUND(
+                        CASE pb.side
+                            WHEN 'YES' THEN (ph.yes_price - pb.entry_price) * pb.bet_size
+                            ELSE (pb.entry_price - ph.yes_price) * pb.bet_size
+                        END, 2
+                    ) as unrealised_pnl
+                FROM paper_bets pb
+                LEFT JOIN (
+                    SELECT market_id, yes_price,
+                           ROW_NUMBER() OVER (PARTITION BY market_id ORDER BY ts DESC) as rn
+                    FROM price_history
+                ) ph ON pb.market_id = ph.market_id AND ph.rn = 1
+                WHERE pb.result = 'open'
+                ORDER BY pb.placed_at DESC
+            """, conn)
+    except Exception as e:
+        logger.error("get_open_positions_detail failed: %s", e)
+        return pd.DataFrame()

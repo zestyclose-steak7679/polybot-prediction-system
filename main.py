@@ -67,11 +67,11 @@ from learning.drift_monitor  import compute_drift_multiplier, compute_edge_decay
 from learning.alpha_diagnostics import collect_alpha_diagnostics, log_alpha_diagnostics
 from learning.regime_stability import get_stable_regime
 from risk.controls        import run_all_checks
-from risk.strategy_killer import get_killed_strategies
+from risk.strategy_killer import get_killed_strategies, revive_eligible_strategies
 from risk.drawdown_controller import get_size_multiplier
 from alerts.telegram      import (send_pick_alert, send_summary,
                                   send_risk_halt, send_startup, send_error,
-                                  send_weekly_report)
+                                  send_weekly_report, send_positions_update)
 from strategies.router    import StrategyRouter
 
 BANKROLL_FILE = Path("bankroll.txt")
@@ -140,6 +140,11 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     position_stats = get_open_position_stats()
     cycle_metrics["open_bets"] = position_stats["n_open"]
     cycle_metrics["avg_hold_hours"] = position_stats["avg_hold_hours"]
+
+    # Send open positions update to Telegram
+    from data.database import get_open_positions_detail
+    open_positions_df = get_open_positions_detail()
+    send_positions_update(open_positions_df)
 
     # 2. Risk checks
     risk_ok, risk_msgs = run_all_checks(bankroll)
@@ -267,6 +272,22 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     # 9. Strategy selection
     killed          = get_killed_strategies()
+
+    # Check for revivals
+    sstats = get_all_strategy_stats()
+    stats_dict = {s["strategy"]: s for s in sstats}
+    revived = revive_eligible_strategies(list(killed), stats_dict)
+
+    # If any revived, remove them from killed list logic
+    import json
+    from risk.strategy_killer import _load_killed, _save_killed
+    if revived:
+        klog = _load_killed()
+        for r in revived:
+            klog.pop(r, None)
+            killed.discard(r)
+        _save_killed(klog)
+
     base_active     = get_active_strategies()
     available       = [s for s in base_active if s not in killed] or base_active
     regimes         = list(regime_map.values())
@@ -478,6 +499,20 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     )
 
     save_bankroll(bankroll)
+
+    from learning.benchmarks import update_benchmarks, check_benchmarks, send_benchmark_alert
+    benchmark_data = update_benchmarks(
+        signals=cycle_metrics["raw_signals"],
+        bets=cycle_metrics["executed_trades"],
+        bankroll=bankroll,
+        timeouts=cycle_metrics["timeout_closed_this_cycle"],
+        closes=cycle_metrics["closed_this_cycle"]
+    )
+    active_strategy_count = len([s for s in routed if s not in get_killed_strategies()])
+    violations = check_benchmarks(benchmark_data, clv, active_strategy_count)
+    if violations:
+        logger.warning("BENCHMARK VIOLATIONS: %s", len(violations))
+        send_benchmark_alert(violations, benchmark_data, bankroll)
 
     # Weekly Report
     weekly_file = Path("last_weekly.txt")
