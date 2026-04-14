@@ -145,7 +145,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     # Send open positions update to Telegram
     from data.database import get_open_positions_detail
     open_positions_df = get_open_positions_detail()
-    send_positions_update(open_positions_df)
+    if not open_positions_df.empty:
+        send_positions_update(open_positions_df)
 
     # 2. Risk checks
     risk_ok, risk_msgs = run_all_checks(bankroll)
@@ -343,6 +344,13 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
                 sig.edge       = round(ep - sig.price, 4)
 
             mw = meta_w.get(sig.strategy, 1/max(len(routed),1))
+
+            # Cold-start bypass: if no models are trained, use raw edge directly
+            if not edge_model.is_trained and not clv_model.is_trained:
+                if sig.edge >= EDGE_THRESHOLD:
+                    enhanced.append(sig)
+                continue
+
             if clv_model.is_trained:
                 combined = (0.45 * sig.edge
                             + 0.30 * clv_pred
