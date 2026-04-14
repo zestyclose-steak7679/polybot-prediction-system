@@ -66,6 +66,7 @@ from learning.online_trainer import run_if_due
 from learning.drift_monitor  import compute_drift_multiplier, compute_edge_decay
 from learning.alpha_diagnostics import collect_alpha_diagnostics, log_alpha_diagnostics
 from learning.regime_stability import get_stable_regime
+from learning.adaptation import adaptation_engine
 from risk.controls        import run_all_checks
 from risk.strategy_killer import get_killed_strategies, revive_eligible_strategies
 from risk.drawdown_controller import get_size_multiplier
@@ -167,6 +168,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     run_if_due(edge_model, clv_model, meta_model)
 
     # 4. Feature drift check
+    adaptation_engine.run_cycle_updates()
     drift_result = compute_drift_multiplier()
     drift_mult = drift_result[0] if isinstance(drift_result, tuple) else float(drift_result)
     if drift_mult < 1.0:
@@ -318,7 +320,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             if not feats:
                 continue
 
-            market_row = df[df["market_id"] == sig.market_id].iloc[0] if not df.empty else pd.Series()
+            market_row = df[df["market_id"] == sig.market_id].iloc[0] if not df.empty else pd.Series(dtype=float)
             history_df = get_history(sig.market_id) if sig.market_id in [s.market_id for s in signals] else pd.DataFrame()
             sig.confidence = compute_confidence(sig, market_row, history_df)
 
@@ -377,7 +379,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     # 13. Portfolio + risk
     allocations = allocate(enhanced, bankroll)
     sigs_list   = [a["signal"] for a in allocations]
-    sizes_list  = [a["bet_size"] * total_mult for a in allocations]
+    sizes_list  = [a["bet_size"] * total_mult * getattr(a["signal"], "adaptive_multiplier", 1.0) for a in allocations]
     sizes_list  = apply_risk_constraints(sigs_list, sizes_list, bankroll)
     cycle_metrics["blocked_by_risk"] = max(len(enhanced) - sum(1 for size in sizes_list if size > 0), 0)
     logger.info(
