@@ -30,7 +30,7 @@ from data.features import FEATURE_COLUMNS, features_to_array
 
 logger = logging.getLogger(__name__)
 
-MODEL_PATH     = "models/edge_model.skops"
+MODEL_PATH     = "models/edge_model.pkl"
 MIN_TRAIN_BETS = 50   # minimum closed bets before training ML model
 
 
@@ -77,7 +77,11 @@ def heuristic_edge(feats: dict, price: float) -> float:
     # Clamp: never claim more than 8% adjustment
     # Heuristic mode must clip output probability to [MIN_PRICE, MAX_PRICE] from config
     prob = price + float(np.clip(delta, -0.08, 0.08))
+
     prob = float(np.clip(prob, float(MIN_PRICE), float(MAX_PRICE)))
+
+    prob = min(max(prob, MIN_PRICE), MAX_PRICE)
+
     return float(prob - price)
 
 
@@ -222,7 +226,7 @@ class EdgeModel:
 
         # Heuristic fallback
         delta = heuristic_edge(feats, price)
-        prob  = float(np.clip(price + delta, 0.0, 1.0))
+        prob = min(max(price + delta, 0.0), 1.0)
         return prob
 
     def feature_importance(self) -> dict | None:

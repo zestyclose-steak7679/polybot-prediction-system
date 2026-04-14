@@ -88,6 +88,29 @@ def send_pick_alert(pick: dict, bankroll: float):
     return _send(text)
 
 
+def send_execution_alert(signal_dict: dict, status: str, reason: str = ""):
+    token, chat_id = _get_credentials()
+    if not token or not chat_id:
+        logger.warning("Telegram token or chat ID is missing, skipping alert.")
+        return False
+
+    market_id = signal_dict.get('market_id', 'N/A')
+    price = signal_dict.get('price', 0.0)
+    size = signal_dict.get('bet_size', 0.0)
+
+    emoji = "✅" if status == "SUCCESS" else "❌" if status == "FAILURE" else "⏭️"
+
+    text = (
+        f"{emoji} EXECUTION {status}\n\n"
+        f"Market ID: {market_id}\n"
+        f"Price: {price:.3f}\n"
+        f"Size: ${size:.2f}\n"
+    )
+    if reason:
+        text += f"Reason: {reason}\n"
+
+    return _send(text)
+
 def _fmt_optional_float(value, digits: int = 4, suffix: str = "") -> str:
     if value is None:
         return "N/A"

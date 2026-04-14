@@ -92,6 +92,15 @@ def allocate(signals: list, bankroll: float) -> list:
         )
 
     total_allocated = sum(a["bet_size"] for a in allocations)
+
+    # --- TASK 5: SYSTEM SAFETY CHECKS (Capital Constraint) ---
+    if total_allocated > bankroll:
+        logger.warning(f"Total allocation (${total_allocated:.2f}) exceeds bankroll (${bankroll:.2f}). Scaling down.")
+        scale_factor = bankroll / total_allocated
+        for a in allocations:
+            a["bet_size"] = round(a["bet_size"] * scale_factor, 2)
+        total_allocated = sum(a["bet_size"] for a in allocations)
+
     logger.info(
         f"Portfolio: {len(allocations)} positions | "
         f"${total_allocated:.2f} deployed ({total_allocated/bankroll*100:.1f}% of bankroll)"

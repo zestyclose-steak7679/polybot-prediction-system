@@ -66,6 +66,7 @@ from learning.online_trainer import run_if_due
 from learning.drift_monitor  import compute_drift_multiplier, compute_edge_decay
 from learning.alpha_diagnostics import collect_alpha_diagnostics, log_alpha_diagnostics
 from learning.regime_stability import get_stable_regime
+from learning.adaptation import adaptation_engine
 from risk.controls        import run_all_checks
 from risk.strategy_killer import get_killed_strategies, revive_eligible_strategies
 from risk.drawdown_controller import get_size_multiplier
@@ -144,7 +145,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     # Send open positions update to Telegram
     from data.database import get_open_positions_detail
     open_positions_df = get_open_positions_detail()
-    send_positions_update(open_positions_df)
+    if not open_positions_df.empty:
+        send_positions_update(open_positions_df)
 
     # 2. Risk checks
     risk_ok, risk_msgs = run_all_checks(bankroll)
@@ -167,6 +169,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     run_if_due(edge_model, clv_model, meta_model)
 
     # 4. Feature drift check
+    adaptation_engine.run_cycle_updates()
     drift_result = compute_drift_multiplier()
     drift_mult = drift_result[0] if isinstance(drift_result, tuple) else float(drift_result)
     if drift_mult < 1.0:
@@ -325,7 +328,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             if not feats:
                 continue
 
-            market_row = df[df["market_id"] == sig.market_id].iloc[0] if not df.empty else pd.Series()
+            market_row = df[df["market_id"] == sig.market_id].iloc[0] if not df.empty else pd.Series(dtype=float)
             history_df = get_history(sig.market_id) if sig.market_id in [s.market_id for s in signals] else pd.DataFrame()
             sig.confidence = compute_confidence(sig, market_row, history_df)
 
@@ -347,7 +350,20 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
                 sig.confidence = round(ep, 4)
                 sig.edge       = round(ep - sig.price, 4)
 
+            if not edge_model.is_trained and not clv_model.is_trained:
+                # Models not ready — use raw heuristic edge
+                if sig.edge >= EDGE_THRESHOLD:
+                    enhanced.append(sig)
+                continue
+
             mw = meta_w.get(sig.strategy, 1/max(len(routed),1))
+
+            # Cold-start bypass: if no models are trained, use raw edge directly
+            if not edge_model.is_trained and not clv_model.is_trained:
+                if sig.edge >= EDGE_THRESHOLD:
+                    enhanced.append(sig)
+                continue
+
             if clv_model.is_trained:
                 combined = (0.45 * sig.edge
                             + 0.30 * clv_pred
@@ -384,7 +400,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     # 13. Portfolio + risk
     allocations = allocate(enhanced, bankroll)
     sigs_list   = [a["signal"] for a in allocations]
-    sizes_list  = [a["bet_size"] * total_mult for a in allocations]
+    sizes_list  = [a["bet_size"] * total_mult * getattr(a["signal"], "adaptive_multiplier", 1.0) for a in allocations]
     sizes_list  = apply_risk_constraints(sigs_list, sizes_list, bankroll)
     cycle_metrics["blocked_by_risk"] = max(len(enhanced) - sum(1 for size in sizes_list if size > 0), 0)
     logger.info(
@@ -416,13 +432,18 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         send_pick_alert(signal_dict, bankroll)
         record_alert(sig.market_id, sig.question, sig.side, sig.strategy, sig.edge)
 
-        bet_id = record_paper_bet(
-            market_id=sig.market_id, question=sig.question,
-            strategy_tag=sig.strategy, side=sig.side,
-            entry_price=sig.price, bet_size=bet_size,
-            bankroll=bankroll, kelly_raw=alloc["kelly_raw"],
-            edge_est=sig.edge, confidence=sig.confidence, reason=sig.reason,
-        )
+        from execution.executor import execute_trade, ExecutionState
+        from execution.validator import validate_signal
+
+        is_valid, val_reason = validate_signal(sig)
+        if not is_valid:
+            logger.info("DATA_INVALID | market_id=%s reason=%s", sig.market_id, val_reason)
+            exec_result = execute_trade(sig, bet_size, bankroll, alloc, current_state=ExecutionState.RECEIVED) # Will be blocked and sent as SKIPPED
+        else:
+            exec_result = execute_trade(sig, bet_size, bankroll, alloc, current_state=ExecutionState.VALIDATED)
+
+        bet_id = exec_result.get("bet_id")
+
         if bet_id and feature_map.get(sig.market_id):
             save_feature_snapshot(bet_id, sig.market_id,
                                   json.dumps(feature_map[sig.market_id]))

@@ -175,6 +175,18 @@ def build_features(market_row: pd.Series, history: pd.DataFrame) -> dict | None:
     if len(prices) < 3:
         return None   # not enough history yet
 
+    # --- TASK 1: PRICE CONTINUITY VALIDATION ---
+    prev_price = float(prices[-2]) if len(prices) >= 2 else float(prices[-1])
+    current_price = float(prices[-1])
+    price_change = abs(current_price - prev_price)
+
+    rolling_std = float(np.std(prices)) if len(prices) >= 3 else 0.05
+
+    if price_change > max(0.15, 3 * rolling_std):
+        logger.debug(f"Price continuity rejection: change={price_change:.3f}, max={max(0.15, 3 * rolling_std):.3f}")
+        return None
+
+
     try:
         feats = {
             "price": float(market_row["yes_price"]),
