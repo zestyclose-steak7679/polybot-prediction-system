@@ -258,7 +258,7 @@ def api_data():
     roi       = pnl / staked * 100 if staked > 0 else 0.0
     win_rate  = float(closed["result"].isin(["win", "timeout_win"]).mean() * 100) if not closed.empty else 0.0
     total     = len(closed)
-    clv_data  = closed["clv"].dropna() if not closed.empty else pd.Series()
+    clv_data  = closed["clv"].dropna() if not closed.empty else pd.Series(dtype=float)
     avg_clv   = float(clv_data.mean()) if len(clv_data) > 0 else None
     clv_pos   = float((clv_data > 0).mean()) if len(clv_data) > 0 else None
     alpha_stats_map = evaluate_alpha_modules(alpha_outcomes)
