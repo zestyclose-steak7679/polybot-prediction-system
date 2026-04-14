@@ -9,8 +9,6 @@ last_train.txt
 regime_state.json
 killed_strategies.json
 daily_benchmarks.json
-20.0
-file
 
 # Logs and models
 logs/
