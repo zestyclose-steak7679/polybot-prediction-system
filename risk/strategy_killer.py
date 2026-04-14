@@ -10,7 +10,7 @@ from data.database import get_closed_bets
 
 logger = logging.getLogger(__name__)
 CLV_KILL_THRESHOLD  = -0.005   # avg CLV < -0.5%
-MIN_BETS_TO_KILL    = 20
+MIN_BETS_TO_KILL    = 30
 ROLLING_WINDOW      = 50
 COOLDOWN_HOURS      = 12
 COOLDOWN_FILE       = "killed_strategies.json"
@@ -47,7 +47,44 @@ def revive_eligible_strategies(killed: list, all_stats: dict) -> list:
     return revived
 
 
+def force_revive_undertrained(min_bets: int = 30) -> None:
+    """
+    On startup, revive any strategies that were killed before
+    seeing min_bets closed bets.
+    """
+    try:
+        killed = _load_killed()
+        if not killed:
+            return
+
+        closed = get_closed_bets()
+        revived = []
+
+        for strategy in list(killed):
+            strategy_bets = closed[closed.get("strategy_tag") == strategy] if not closed.empty else pd.DataFrame()
+            if len(strategy_bets) < min_bets:
+                revived.append(strategy)
+                logger.info("Force reviving %s — only %s bets when killed", strategy, len(strategy_bets))
+
+        if revived:
+            remaining = {s: ts for s, ts in killed.items() if s not in revived}
+            _save_killed(remaining)
+            logger.info("Revived strategies: %s | Still killed: %s", revived, list(remaining.keys()))
+    except Exception as e:
+        logger.error("force_revive_undertrained failed: %s", e)
+
+
 def get_killed_strategies() -> set:
+    try:
+        closed = get_closed_bets()
+        total_closed = len(closed) if not closed.empty else 0
+
+        if total_closed < 30:
+            logger.info("Strategy killer dormant — only %s total closed bets (need 30)", total_closed)
+            return set()  # Don't kill anyone yet
+    except Exception:
+        pass
+
     df = get_closed_bets(limit=500)
     killed_log = _load_killed()
     now = _utc_now()

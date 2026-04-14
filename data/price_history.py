@@ -29,6 +29,58 @@ def _utc_now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def _count_history_rows() -> int:
+    try:
+        with _conn() as conn:
+            result = conn.execute("SELECT COUNT(*) FROM price_history").fetchone()
+            return result[0] if result else 0
+    except Exception:
+        return 0
+
+
+def seed_price_history_from_markets(df: pd.DataFrame) -> int:
+    """
+    On first run (empty history), seed the price_history table
+    from current market snapshot so feature engineering can start immediately.
+    Returns number of markets seeded.
+    """
+    try:
+        existing = _count_history_rows()
+        if existing > 0:
+            return 0  # Already have history, don't seed
+
+        seeded = 0
+        now = _utc_now().isoformat()
+        rows = []
+        for _, row in df.iterrows():
+            try:
+                market_id = str(row.get("market_id", ""))
+                yes_price = float(row.get("yes_price", 0.5))
+                volume = float(row.get("volume", 0))
+                liquidity = float(row.get("liquidity", 0))
+                if not market_id:
+                    continue
+                # Insert 3 identical rows to create minimal history
+                for _ in range(3):
+                    rows.append((market_id, yes_price, volume, liquidity, now))
+                seeded += 1
+            except Exception:
+                continue
+
+        if rows:
+            with _conn() as con:
+                con.executemany(
+                    "INSERT INTO price_history (market_id, yes_price, volume, liquidity, logged_at) VALUES (?,?,?,?,?)",
+                    rows,
+                )
+                con.commit()
+        logger.info("Seeded price history: %s markets", seeded)
+        return seeded
+    except Exception as e:
+        logger.error("seed_price_history_from_markets failed: %s", e)
+        return 0
+
+
 def init_price_history():
     with _conn() as con:
         con.execute("""

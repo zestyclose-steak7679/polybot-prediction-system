@@ -98,6 +98,49 @@ def model_mode() -> str:
     return f"{edge_mode}/CLV{clv_mode}/META{meta_mode}"
 
 
+def _generate_heuristic_fallback(df: pd.DataFrame, bankroll: float) -> list:
+    """
+    Generate basic signals from raw market data when price history is unavailable.
+    Uses only current price, volume and liquidity — no historical features needed.
+    """
+    from scoring.strategies import Signal
+    from config import EDGE_THRESHOLD
+    signals = []
+    try:
+        for _, row in df.iterrows():
+            price = float(row.get("yes_price", 0.5))
+            volume = float(row.get("volume", 0))
+            liquidity = float(row.get("liquidity", 0))
+            change = float(row.get("one_day_change", 0))
+
+            # Only consider markets with meaningful activity
+            if volume < 2000 or liquidity < 1000:
+                continue
+
+            # Simple momentum signal — price moved meaningfully
+            if abs(change) >= 0.05 and 0.10 <= price <= 0.90:
+                side = "YES" if change > 0 else "NO"
+                bet_price = price if side == "YES" else 1 - price
+                edge = abs(change) * 0.3  # conservative edge estimate
+                if edge >= EDGE_THRESHOLD:
+                    signals.append(Signal(
+                        strategy="momentum_heuristic",
+                        market_id=str(row.get("market_id", "")),
+                        question=str(row.get("question", ""))[:80],
+                        side=side,
+                        price=bet_price,
+                        confidence=0.3,
+                        edge=round(edge, 4),
+                        reason=f"Heuristic fallback: {change:.1%} move, no history yet",
+                        liquidity=liquidity,
+                        volume=volume,
+                        one_day_change=change,
+                    ))
+    except Exception as e:
+        logger.error("Heuristic fallback error: %s", e)
+    return signals[:3]  # max 3 fallback signals per cycle
+
+
 def run_cycle(bankroll: float, startup: bool = False) -> float:
     cycle_ts = datetime.now(UTC).replace(tzinfo=None).isoformat()
     logger.info("=" * 65)
@@ -180,6 +223,9 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         send_error("No markets survived API intake. Check tag matching and upstream filters.")
         save_bankroll(bankroll)
         return bankroll
+
+    from data.price_history import seed_price_history_from_markets
+    seed_price_history_from_markets(raw_df)
     resolved_alpha = resolve_alpha_signals(raw_df)
     cycle_metrics["resolved_alpha_count"] = resolved_alpha
     if resolved_alpha:
@@ -227,7 +273,18 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     logger.info(f"Markets with sufficient history: {len(feature_map)}")
     if not feature_map:
-        logger.info("Waiting for more price history before generating feature-driven signals.")
+        logger.info("No price history yet — running heuristic fallback signals")
+        # Generate basic signals from raw market data without features
+        fallback_signals = _generate_heuristic_fallback(raw_df, bankroll)
+        if fallback_signals:
+            logger.info("Heuristic fallback: %s signals generated", len(fallback_signals))
+            for sig in fallback_signals:
+                if was_recently_alerted(sig.market_id):
+                    continue
+                signal_dict = {**sig.__dict__, "bet_size": sig.edge * bankroll * 0.01,
+                              "kelly_raw": sig.edge, "decimal_odds": 1/(sig.price + 1e-6)}
+                send_pick_alert(signal_dict, bankroll)
+                record_alert(sig.market_id, sig.question, sig.side, sig.strategy, sig.edge)
         save_bankroll(bankroll)
         return bankroll
 
@@ -485,20 +542,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         cycle_metrics["triggered_shadow_signals"],
     )
 
-    logger.info(
-        "HEALTH | bankroll=$%.2f | bets=%s | win_rate=%.1f%% | avg_clv=%.4f | "
-        "signals_raw=%s | signals_executed=%s | regime=%s | model=%s",
-        bankroll,
-        stats.get("total_bets", 0),
-        stats.get("win_rate", 0.0),
-        clv.get("avg_clv", 0.0),
-        cycle_metrics["raw_signals"],
-        cycle_metrics["executed_trades"],
-        dom_regime,
-        mmode,
-    )
-
-    save_bankroll(bankroll)
+    active_count = len([s for s in routed if s not in get_killed_strategies()])
+    killed_count = len(get_killed_strategies())
 
     from learning.benchmarks import update_benchmarks, check_benchmarks, send_benchmark_alert
     benchmark_data = update_benchmarks(
@@ -508,7 +553,30 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         timeouts=cycle_metrics["timeout_closed_this_cycle"],
         closes=cycle_metrics["closed_this_cycle"]
     )
-    active_strategy_count = len([s for s in routed if s not in get_killed_strategies()])
+
+    logger.info(
+        "HEALTH | bankroll=$%.2f | bets_total=%s | win_rate=%.1f%% | avg_clv=%.4f | "
+        "signals_raw=%s | signals_executed=%s | regime=%s | model=%s | "
+        "strategies_active=%s | strategies_killed=%s | open_positions=%s | "
+        "bets_today=%s | signals_today=%s",
+        bankroll,
+        stats.get("total_bets", 0),
+        stats.get("win_rate", 0.0),
+        clv.get("avg_clv", 0.0),
+        cycle_metrics["raw_signals"],
+        cycle_metrics["executed_trades"],
+        dom_regime,
+        mmode,
+        active_count,
+        killed_count,
+        cycle_metrics["open_bets"],
+        benchmark_data.get("bets_today", 0),
+        benchmark_data.get("signals_today", 0),
+    )
+
+    save_bankroll(bankroll)
+
+    active_strategy_count = active_count
     violations = check_benchmarks(benchmark_data, clv, active_strategy_count)
     if violations:
         logger.warning("BENCHMARK VIOLATIONS: %s", len(violations))
@@ -584,6 +652,9 @@ def preflight_check() -> bool:
     return ok
 
 def main():
+    # Force revive strategies killed with insufficient data
+    from risk.strategy_killer import force_revive_undertrained
+    force_revive_undertrained(min_bets=30)
     if not preflight_check():
         logger.error("Preflight failed — exiting")
         sys.exit(1)
