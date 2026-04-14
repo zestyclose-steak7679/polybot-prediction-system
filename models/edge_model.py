@@ -77,7 +77,7 @@ def heuristic_edge(feats: dict, price: float) -> float:
     # Clamp: never claim more than 8% adjustment
     # Heuristic mode must clip output probability to [MIN_PRICE, MAX_PRICE] from config
     prob = price + float(np.clip(delta, -0.08, 0.08))
-    prob = float(np.clip(prob, MIN_PRICE, MAX_PRICE))
+    prob = min(max(prob, MIN_PRICE), MAX_PRICE)
     return float(prob - price)
 
 
@@ -222,7 +222,7 @@ class EdgeModel:
 
         # Heuristic fallback
         delta = heuristic_edge(feats, price)
-        prob  = float(np.clip(price + delta, 0.0, 1.0))
+        prob = min(max(price + delta, 0.0), 1.0)
         return prob
 
     def feature_importance(self) -> dict | None:

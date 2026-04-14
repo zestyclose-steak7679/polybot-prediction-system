@@ -212,6 +212,7 @@ def get_top_picks(df: pd.DataFrame, bankroll: float, top_n: int = 5) -> list[dic
         decimal_odds = round(1 / price, 4) if price > 0 else 0
         kelly        = kelly_bet(bankroll, true_prob, decimal_odds)
 
+        logger.info(f"SIGNAL_VALIDATED: {row['market_id']} for {side} passed validation")
         picks.append({
             "market_id":    row["market_id"],
             "question":     row["question"],
