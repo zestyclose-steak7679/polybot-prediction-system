@@ -134,6 +134,16 @@ def settle_and_compute_clv(bankroll: float) -> tuple[float, dict]:
             direction = -1
             clv = (current_price - entry_price) * direction
 
+        try:
+            from execution.executor import log_structured
+            log_structured("tracking.clv", "CLV_RECORDED", market_id, "SUCCESS", {
+                "entry_price": entry_price,
+                "closing_price": current_price,
+                "clv": clv
+            })
+        except Exception as e:
+            logger.error("Failed to log structured CLV: %s", e)
+
         # --- Compute P&L ---
         if won:
             pnl = bet_size * (1.0 / entry_price - 1.0)

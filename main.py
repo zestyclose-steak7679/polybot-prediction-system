@@ -409,13 +409,18 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         send_pick_alert(signal_dict, bankroll)
         record_alert(sig.market_id, sig.question, sig.side, sig.strategy, sig.edge)
 
-        bet_id = record_paper_bet(
-            market_id=sig.market_id, question=sig.question,
-            strategy_tag=sig.strategy, side=sig.side,
-            entry_price=sig.price, bet_size=bet_size,
-            bankroll=bankroll, kelly_raw=alloc["kelly_raw"],
-            edge_est=sig.edge, confidence=sig.confidence, reason=sig.reason,
-        )
+        from execution.executor import execute_trade, ExecutionState
+        from execution.validator import validate_signal
+
+        is_valid, val_reason = validate_signal(sig)
+        if not is_valid:
+            logger.info("DATA_INVALID | market_id=%s reason=%s", sig.market_id, val_reason)
+            exec_result = execute_trade(sig, bet_size, bankroll, alloc, current_state=ExecutionState.RECEIVED) # Will be blocked and sent as SKIPPED
+        else:
+            exec_result = execute_trade(sig, bet_size, bankroll, alloc, current_state=ExecutionState.VALIDATED)
+
+        bet_id = exec_result.get("bet_id")
+
         if bet_id and feature_map.get(sig.market_id):
             save_feature_snapshot(bet_id, sig.market_id,
                                   json.dumps(feature_map[sig.market_id]))
