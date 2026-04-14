@@ -94,7 +94,9 @@ class TestEngine(unittest.TestCase):
 
     def test_score_market_intermediate(self):
         row = pd.Series([1000, 100000, -0.10, 0.75, 0.21], index=["liquidity", "volume", "one_day_change", "yes_price", "no_price"])
+
         # weights = {"liquidity":0.30, "momentum":0.25, "tension":0.20, "efficiency":0.15, "volume_raw":0.10}
+
         # total expected = 0.5*0.3 + 0.5*0.25 + 0.5*0.2 + 0.5*0.15 + (5/7)*0.10 = 0.15 + 0.125 + 0.1 + 0.075 + 0.07142857 = 0.52142857
         score = score_market(row)
         self.assertAlmostEqual(score, 0.5214, places=4)
@@ -107,11 +109,30 @@ class TestEngine(unittest.TestCase):
 
     # --- score_all Tests ---
     def test_score_all(self):
+
+        data = {
+            "market_id": ["A", "B"],
+            "liquidity": [0, 10**6],
+            "volume": [0, 10**7],
+            "one_day_change": [0, 0.20],
+            "yes_price": [1.0, 0.5],
+            "no_price": [0.08, 0.5]
+        }
+        df = pd.DataFrame(data)
+        scored_df = score_all(df)
+        self.assertEqual(len(scored_df), 2)
+        # Should be sorted descending by score
+        self.assertEqual(scored_df.iloc[0]["market_id"], "B")
+        self.assertAlmostEqual(scored_df.iloc[0]["score"], 1.0, places=4)
+        self.assertEqual(scored_df.iloc[1]["market_id"], "A")
+        self.assertAlmostEqual(scored_df.iloc[1]["score"], 0.0, places=4)
+
         df = pd.DataFrame([["A", 0, 0, 0, 1.0, 0.08], ["B", 10**6, 10**7, 0.20, 0.5, 0.5]], columns=["market_id", "liquidity", "volume", "one_day_change", "yes_price", "no_price"])
         scored = __import__('scoring').engine.score_all(df)
         self.assertEqual(list(scored["market_id"]), ["B", "A"]) # B should score higher than A
         self.assertAlmostEqual(scored.iloc[0]["score"], 1.0, places=4)
         self.assertAlmostEqual(scored.iloc[1]["score"], 0.0, places=4)
+
 
     # --- estimate_edge Tests ---
     def test_estimate_edge_yes(self):
@@ -191,7 +212,22 @@ class TestEngine(unittest.TestCase):
         self.assertEqual(get_top_picks(pd.DataFrame(), 1000), [])
 
     def test_get_top_picks(self):
+
+        data = {
+            "market_id": ["A", "B"],
+            "question": ["Q1", "Q2"],
+            "tags": ["T1", "T2"],
+            "liquidity": [10**6, 0],
+            "volume": [10**7, 0],
+            "one_day_change": [0.20, 0],
+            "yes_price": [0.5, 1.0],
+            "no_price": [0.5, 0.08],
+            "end_date": ["2025-01-01", "2025-01-01"]
+        }
+        df = pd.DataFrame(data)
+
         df = pd.DataFrame([["A", "Q1", "T1", 10**6, 10**7, 0.20, 0.5, 0.5, "2025-01-01"], ["B", "Q2", "T2", 0, 0, 0, 1.0, 0.08, "2025-01-01"]], columns=["market_id", "question", "tags", "liquidity", "volume", "one_day_change", "yes_price", "no_price", "end_date"])
+
         picks = get_top_picks(df, 1000)
         self.assertTrue(len(picks) > 0)
         self.assertEqual(picks[0]["market_id"], "A")

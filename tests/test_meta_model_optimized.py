@@ -58,11 +58,25 @@ class TestMetaModelVectorization(unittest.TestCase):
         self.assertIn("strat2", weights)
         self.assertIn("strat3", weights)
 
+
+        # Check normalized weights via softmax (0.1, 0.2, 0.3)
+        # exp(0.1)=1.105, exp(0.2)=1.221, exp(0.3)=1.349 -> sum=3.675
+        # strat1 = 1.105 / 3.675 = 0.3006
+        import numpy as np
+        vals = np.array([0.1, 0.2, 0.3])
+        exp_vals = np.exp(vals - np.max(vals))
+        expected_softmax = exp_vals / np.sum(exp_vals)
+
+        self.assertAlmostEqual(weights["strat1"], expected_softmax[0])
+        self.assertAlmostEqual(weights["strat2"], expected_softmax[1])
+        self.assertAlmostEqual(weights["strat3"], expected_softmax[2])
+
         # Check normalized weights (0.1, 0.2, 0.3 -> sum=0.6 -> 1/6, 2/6, 3/6)
         total = 0.1 + 0.2 + 0.3
         self.assertTrue("strat1" in weights)
         self.assertTrue("strat2" in weights)
         self.assertTrue("strat3" in weights)
+
 
     def test_predict_weights_exception_fallback(self):
         strategy_names = ["strat1", "strat2"]

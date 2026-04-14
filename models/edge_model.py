@@ -77,7 +77,11 @@ def heuristic_edge(feats: dict, price: float) -> float:
     # Clamp: never claim more than 8% adjustment
     # Heuristic mode must clip output probability to [MIN_PRICE, MAX_PRICE] from config
     prob = price + float(np.clip(delta, -0.08, 0.08))
+
+    prob = float(np.clip(prob, float(MIN_PRICE), float(MAX_PRICE)))
+
     prob = min(max(prob, MIN_PRICE), MAX_PRICE)
+
     return float(prob - price)
 
 

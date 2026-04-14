@@ -251,6 +251,13 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     )
     if alpha_diag_summary:
         logger.info("Alpha feedback | %s", alpha_diag_summary)
+
+    try:
+        from alpha.quant_engine import run_quant_pipeline
+        run_quant_pipeline(feature_ready_df, feature_map, history_map)
+    except Exception as e:
+        logger.warning(f"Quant pipeline shadow evaluation failed: {e}")
+
     alpha_signals = build_alpha_signals(feature_ready_df, feature_map, regime_map, history_map)
     logged_alpha = log_alpha_signals(alpha_signals, cycle_ts=cycle_ts)
     cycle_metrics["triggered_shadow_signals"] = logged_alpha
