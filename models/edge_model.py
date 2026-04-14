@@ -30,7 +30,7 @@ from data.features import FEATURE_COLUMNS, features_to_array
 
 logger = logging.getLogger(__name__)
 
-MODEL_PATH     = "models/edge_model.skops"
+MODEL_PATH     = "models/edge_model.pkl"
 MIN_TRAIN_BETS = 50   # minimum closed bets before training ML model
 
 
