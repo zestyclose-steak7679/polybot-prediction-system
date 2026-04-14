@@ -121,6 +121,31 @@ def settle_and_compute_clv(bankroll: float) -> tuple[float, dict]:
         )
         is_stale = hours_open_val >= MAX_POSITION_AGE_HOURS
 
+        # --- TASK 2: MULTI-HORIZON CLV TRACKING ---
+        minutes_open = hours_open_val * 60
+        direction = 1 if side == "YES" else -1
+        current_clv = (current_price - entry_price) * direction
+
+        updates = []
+        if minutes_open >= 5 and pd.isna(bet.get("clv_5m", float("nan"))):
+            updates.append(("clv_5m", current_clv))
+        if minutes_open >= 15 and pd.isna(bet.get("clv_15m", float("nan"))):
+            updates.append(("clv_15m", current_clv))
+        if minutes_open >= 60 and pd.isna(bet.get("clv_60m", float("nan"))):
+            updates.append(("clv_60m", current_clv))
+
+        if updates:
+            try:
+                conn = sqlite3.connect(_DB_PATH)
+                cursor = conn.cursor()
+                set_clause = ", ".join([f"{k}=?" for k, v in updates])
+                values = [v for k, v in updates] + [bet["id"]]
+                cursor.execute(f"UPDATE paper_bets SET {set_clause} WHERE id=?", values)
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                logger.error(f"Failed to update multi-horizon CLV: {e}")
+
         if not (is_resolved or is_stale):
             continue  # still live, skip
 
@@ -133,6 +158,16 @@ def settle_and_compute_clv(bankroll: float) -> tuple[float, dict]:
             won = current_price <= 0.05
             direction = -1
             clv = (current_price - entry_price) * direction
+
+        try:
+            from execution.executor import log_structured
+            log_structured("tracking.clv", "CLV_RECORDED", market_id, "SUCCESS", {
+                "entry_price": entry_price,
+                "closing_price": current_price,
+                "clv": clv
+            })
+        except Exception as e:
+            logger.error("Failed to log structured CLV: %s", e)
 
         # --- Compute P&L ---
         if won:
@@ -183,7 +218,7 @@ def settle_and_compute_clv(bankroll: float) -> tuple[float, dict]:
 
 def clv_report() -> dict:
     df = get_closed_bets()
-    clv_data = df["clv"].dropna() if not df.empty else pd.Series()
+    clv_data = df["clv"].dropna() if not df.empty else pd.Series(dtype=float)
     if clv_data.empty:
         return {"n":0,"avg_clv":0.0,"positive_rate":0.0,"clv_sharpe":0.0,"strategy_clv":{}}
 

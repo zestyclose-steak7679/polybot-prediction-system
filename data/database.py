@@ -76,7 +76,8 @@ def init_db():
             confidence REAL, reason TEXT, placed_at TEXT,
             result TEXT DEFAULT 'open',
             exit_price REAL, closing_price REAL,
-            pnl REAL, roi REAL, clv REAL, closed_at TEXT
+            pnl REAL, roi REAL, clv REAL, closed_at TEXT,
+            clv_5m REAL, clv_15m REAL, clv_60m REAL
         );
         CREATE TABLE IF NOT EXISTS market_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

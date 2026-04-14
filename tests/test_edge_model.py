@@ -16,14 +16,14 @@ class TestEdgeModel(unittest.TestCase):
         # if abs(z_score) > 1.5: delta -= sign(z) * min(abs(z) * 0.015, 0.04)
         # 2.0 > 1.5 -> sign(2) * min(2*0.015, 0.04) = 1 * min(0.03, 0.04) = 0.03
         # so delta = -0.03
-        # price = 0.5 -> prob = np.clip(0.5 - 0.03, 0.01, 0.99) = 0.47
+        # price = 0.5 -> prob = np.clip(0.5 - 0.03, 0.05, 0.95) = 0.47
         feats = {"price": 0.5, "z_score": 2.0}
 
         prob = model.predict_prob(feats)
 
         # Verify the probability is exactly what heuristic_edge returns
         expected_delta = heuristic_edge(feats, 0.5)
-        expected_prob = float(np.clip(0.5 + expected_delta, 0.01, 0.99))
+        expected_prob = float(np.clip(0.5 + expected_delta, 0.05, 0.95))
 
         self.assertAlmostEqual(prob, expected_prob, places=4)
         self.assertAlmostEqual(prob, 0.47, places=4)
@@ -46,7 +46,7 @@ class TestEdgeModel(unittest.TestCase):
 
         # Calculate expected fallback output
         expected_delta = heuristic_edge(feats, 0.6)
-        expected_prob = float(np.clip(0.6 + expected_delta, 0.01, 0.99))
+        expected_prob = float(np.clip(0.6 + expected_delta, 0.05, 0.95))
 
         self.assertAlmostEqual(prob, expected_prob, places=4)
         self.assertAlmostEqual(prob, 0.63, places=4)
