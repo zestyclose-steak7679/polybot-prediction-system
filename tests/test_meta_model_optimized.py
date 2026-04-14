@@ -6,6 +6,12 @@ import sys
 # Mock numpy, pandas, and config before importing MetaModel
 mock_np = MagicMock()
 
+# sys.modules['numpy'] = mock_np
+# sys.modules['pandas'] = MagicMock()
+# sys.modules['config'] = MagicMock()
+
+
+
 
 
 
@@ -72,10 +78,21 @@ class TestMetaModelVectorization(unittest.TestCase):
         self.assertAlmostEqual(weights["strat3"], expected_softmax[2])
 
         # Check normalized weights (0.1, 0.2, 0.3 -> sum=0.6 -> 1/6, 2/6, 3/6)
+        # weights = softmax([0.1, 0.2, 0.3])
+        import numpy as np
+        vals = np.array([0.1, 0.2, 0.3])
+        exp_vals = np.exp(vals - np.max(vals))
+        softmax_vals = exp_vals / np.sum(exp_vals)
+
+        self.assertAlmostEqual(weights["strat1"], softmax_vals[0])
+        self.assertAlmostEqual(weights["strat2"], softmax_vals[1])
+        self.assertAlmostEqual(weights["strat3"], softmax_vals[2])
+
         total = 0.1 + 0.2 + 0.3
         self.assertTrue("strat1" in weights)
         self.assertTrue("strat2" in weights)
         self.assertTrue("strat3" in weights)
+
 
 
     def test_predict_weights_exception_fallback(self):
