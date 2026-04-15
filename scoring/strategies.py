@@ -26,8 +26,10 @@ from config import (
     EDGE_THRESHOLD,
     MIN_VOLUME,
 )
+from utils.logger import get_structured_logger
 
 logger = logging.getLogger(__name__)
+struct_logger = get_structured_logger("scoring.strategies")
 
 
 @dataclass
@@ -255,4 +257,6 @@ def run_strategies(df: pd.DataFrame, active: list[str]) -> list[Signal]:
     # Sort by edge descending
     signals.sort(key=lambda s: s.edge, reverse=True)
     logger.info(f"Strategies produced {len(signals)} signals")
+    for sig in signals:
+        struct_logger.info("signal_generation", sig.market_id, "success", {"strategy": sig.strategy, "side": sig.side, "edge": sig.edge})
     return signals

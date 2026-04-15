@@ -73,6 +73,8 @@ from alerts.telegram      import (send_pick_alert, send_summary,
                                   send_risk_halt, send_startup, send_error,
                                   send_weekly_report, send_positions_update)
 from strategies.router    import StrategyRouter
+from execution.engine     import ExecutionEngine
+from utils.logger         import get_structured_logger
 
 BANKROLL_FILE = Path("bankroll.txt")
 router = StrategyRouter()
@@ -98,10 +100,13 @@ def model_mode() -> str:
     return f"{edge_mode}/CLV{clv_mode}/META{meta_mode}"
 
 
+struct_logger = get_structured_logger("main.pipeline")
+
 def run_cycle(bankroll: float, startup: bool = False) -> float:
     cycle_ts = datetime.now(UTC).replace(tzinfo=None).isoformat()
     logger.info("=" * 65)
     logger.info("CYCLE | %s | $%.2f", cycle_ts, bankroll)
+    struct_logger.info("cycle_start", "all", "success", {"bankroll": bankroll})
 
     if startup:
         send_startup(bankroll)
@@ -318,7 +323,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             if not feats:
                 continue
 
-            market_row = df[df["market_id"] == sig.market_id].iloc[0] if not df.empty else pd.Series()
+            market_row = df[df["market_id"] == sig.market_id].iloc[0] if not df.empty else pd.Series(dtype=float)
             history_df = get_history(sig.market_id) if sig.market_id in [s.market_id for s in signals] else pd.DataFrame()
             sig.confidence = compute_confidence(sig, market_row, history_df)
 
@@ -388,6 +393,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     # 14. Alert + log
     new_alerts = 0
     for alloc, bet_size in zip(allocations, sizes_list):
+        engine = ExecutionEngine(bankroll)
         sig    = alloc["signal"]
         regime = regime_map.get(sig.market_id, dom_regime)
 
@@ -406,32 +412,35 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
         logger.info(f"ALERT | {sig.strategy}/{regime} | {sig.side} "
                     f"'{sig.question[:45]}' edge={sig.edge:.3f} ${bet_size:.2f}")
-        send_pick_alert(signal_dict, bankroll)
+
         record_alert(sig.market_id, sig.question, sig.side, sig.strategy, sig.edge)
 
-        bet_id = record_paper_bet(
-            market_id=sig.market_id, question=sig.question,
-            strategy_tag=sig.strategy, side=sig.side,
-            entry_price=sig.price, bet_size=bet_size,
-            bankroll=bankroll, kelly_raw=alloc["kelly_raw"],
-            edge_est=sig.edge, confidence=sig.confidence, reason=sig.reason,
+        bet_id, exec_status = engine.execute_signal(
+            signal=sig,
+            bet_size=bet_size,
+            kelly_raw=alloc["kelly_raw"],
+            decimal_odds=alloc["decimal_odds"]
         )
-        if bet_id and feature_map.get(sig.market_id):
-            save_feature_snapshot(bet_id, sig.market_id,
-                                  json.dumps(feature_map[sig.market_id]))
 
-            # Recompute predicted clv for logging to avoid variable scoping issues from loop above
-            pred_clv = clv_model.predict(feature_map[sig.market_id]) if clv_model.is_trained else 0.0
-            log_predicted_clv(
-                market_id=sig.market_id,
-                entry_price=sig.price,
-                predicted_clv=pred_clv,
-                signal_edge=sig.edge,
-                strategy=sig.strategy,
-                cycle_ts=cycle_metrics.get("cycle_start", datetime.now(UTC).replace(tzinfo=None).isoformat())
-            )
-        bankroll -= bet_size
-        new_alerts += 1
+        if bet_id and exec_status == "success":
+            if feature_map.get(sig.market_id):
+                save_feature_snapshot(bet_id, sig.market_id,
+                                      json.dumps(feature_map[sig.market_id]))
+
+                # Recompute predicted clv for logging to avoid variable scoping issues from loop above
+                pred_clv = clv_model.predict(feature_map[sig.market_id]) if clv_model.is_trained else 0.0
+                log_predicted_clv(
+                    market_id=sig.market_id,
+                    entry_price=sig.price,
+                    predicted_clv=pred_clv,
+                    signal_edge=sig.edge,
+                    strategy=sig.strategy,
+                    cycle_ts=cycle_metrics.get("cycle_start", datetime.now(UTC).replace(tzinfo=None).isoformat())
+                )
+            bankroll -= bet_size
+            new_alerts += 1
+        elif exec_status == "shadow":
+            new_alerts += 1 # We still consider it processed
 
     cycle_metrics["executed_trades"] = new_alerts
     position_stats = get_open_position_stats()
