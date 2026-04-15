@@ -20,8 +20,11 @@ def _is_stale(end_date_str: str) -> bool:
     if not end_date_str:
         return False
     try:
-        end = datetime.fromisoformat(str(end_date_str).replace("Z", "").split("+")[0])
-        return end < _utc_now()
+        dt = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+        if dt.tzinfo is not None:
+            from datetime import timezone
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt < _utc_now()
     except Exception:
         return False
 
