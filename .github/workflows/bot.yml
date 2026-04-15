@@ -48,20 +48,13 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           BANKROLL: ${{ secrets.BANKROLL }}
 
-      - name: Save state cache
+      - name: Persist state
         if: always()
-        uses: actions/cache@v4
-        with:
-          path: |
-            polybot.db
-            polybot.db-wal
-            polybot.db-shm
-            bankroll.txt
-            peak_bankroll.txt
-            last_train.txt
-            killed_strategies.json
-            regime_state.json
-            last_weekly.txt
-            models/edge_model.pkl
-            models/regime_kmeans.pkl
-          key: polybot-state-v3-${{ github.run_id }}
+        run: |
+          git config user.name "polybot"
+          git config user.email "bot@polybot"
+          git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json daily_benchmarks.json
+          git diff --staged --quiet || git commit -m "chore: state [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
