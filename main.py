@@ -193,6 +193,13 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     cycle_metrics["resolved_alpha_count"] = resolved_alpha
     if resolved_alpha:
         logger.info("Alpha outcomes resolved this cycle: %s", resolved_alpha)
+
+    # Log prices for ALL fetched markets FIRST — before filtering
+    # This maximises history accumulation and ensures apply_filters
+    # and feature builder both see current data in the same cycle.
+    log_prices(raw_df)
+    purge_old_history(days=30)
+
     df = apply_filters(raw_df)
     df = apply_diversity_filter(df)
     logger.info("Markets after filters and diversity: %s", len(df))
@@ -202,8 +209,6 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         return bankroll
 
     # 6. Price history
-    log_prices(df)
-    purge_old_history(days=30)
 
     # 7-8. Features + regime per market
     feature_map, history_map, regime_map, regime_vecs = {}, {}, {}, []

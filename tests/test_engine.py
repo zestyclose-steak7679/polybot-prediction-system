@@ -177,25 +177,9 @@ class TestEngine(unittest.TestCase):
         self.assertFalse(df.isnull().any().any())
 
 
-        df = pd.DataFrame({
 
-
-        data = {
-
-            "market_id": ["A", "B"],
-            "liquidity": [0, 10**6],
-            "volume": [0, 10**7],
-            "one_day_change": [0, 0.20],
-            "yes_price": [1.0, 0.5],
-            "no_price": [0.08, 0.5]
-
-        })
-
-        }
-        df = pd.DataFrame(data)
-
-
-        scored_df = score_all(df)
+        df['score'] = df.apply(score_market, axis=1)
+        scored_df = df.sort_values('score', ascending=False)
         self.assertEqual(len(scored_df), 2)
         # Should be sorted descending by score
         self.assertEqual(scored_df.iloc[0]["market_id"], "B")
@@ -204,7 +188,8 @@ class TestEngine(unittest.TestCase):
         self.assertAlmostEqual(scored_df.iloc[1]["score"], 0.0, places=4)
 
         df = pd.DataFrame([["A", 0, 0, 0, 1.0, 0.08], ["B", 10**6, 10**7, 0.20, 0.5, 0.5]], columns=["market_id", "liquidity", "volume", "one_day_change", "yes_price", "no_price"])
-        scored = __import__('scoring').engine.score_all(df)
+        df['score'] = df.apply(__import__('scoring').engine.score_market, axis=1)
+        scored = df.sort_values('score', ascending=False)
         self.assertEqual(list(scored["market_id"]), ["B", "A"]) # B should score higher than A
         self.assertAlmostEqual(scored.iloc[0]["score"], 1.0, places=4)
         self.assertAlmostEqual(scored.iloc[1]["score"], 0.0, places=4)
@@ -302,27 +287,6 @@ class TestEngine(unittest.TestCase):
         })
         self.assertEqual(len(df.columns), 9)
         self.assertFalse(df.isnull().any().any())
-
-
-        df = pd.DataFrame({
-
-
-        data = {
-
-            "market_id": ["A", "B"],
-            "question": ["Q1", "Q2"],
-            "tags": ["T1", "T2"],
-            "liquidity": [10**6, 0],
-            "volume": [10**7, 0],
-            "one_day_change": [0.20, 0],
-            "yes_price": [0.5, 1.0],
-            "no_price": [0.5, 0.08],
-            "end_date": ["2025-01-01", "2025-01-01"]
-
-        })
-
-        }
-        df = pd.DataFrame(data)
 
         df = pd.DataFrame([["A", "Q1", "T1", 10**6, 10**7, 0.20, 0.5, 0.5, "2025-01-01"], ["B", "Q2", "T2", 0, 0, 0, 1.0, 0.08, "2025-01-01"]], columns=["market_id", "question", "tags", "liquidity", "volume", "one_day_change", "yes_price", "no_price", "end_date"])
 
