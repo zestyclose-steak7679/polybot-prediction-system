@@ -477,36 +477,6 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         elif exec_status == "shadow":
             new_alerts += 1 # We still consider it processed
 
-        from execution.executor import execute_trade, ExecutionState
-        from execution.validator import validate_signal
-
-        is_valid, val_reason = validate_signal(sig)
-        if not is_valid:
-            logger.info("DATA_INVALID | market_id=%s reason=%s", sig.market_id, val_reason)
-            exec_result = execute_trade(sig, bet_size, bankroll, alloc, current_state=ExecutionState.RECEIVED) # Will be blocked and sent as SKIPPED
-        else:
-            exec_result = execute_trade(sig, bet_size, bankroll, alloc, current_state=ExecutionState.VALIDATED)
-
-        bet_id = exec_result.get("bet_id")
-
-        if bet_id and feature_map.get(sig.market_id):
-            save_feature_snapshot(bet_id, sig.market_id,
-                                  json.dumps(feature_map[sig.market_id]))
-
-            # Recompute predicted clv for logging to avoid variable scoping issues from loop above
-            pred_clv = clv_model.predict(feature_map[sig.market_id]) if clv_model.is_trained else 0.0
-            log_predicted_clv(
-                market_id=sig.market_id,
-                entry_price=sig.price,
-                predicted_clv=pred_clv,
-                signal_edge=sig.edge,
-                strategy=sig.strategy,
-                cycle_ts=cycle_metrics.get("cycle_start", datetime.now(UTC).replace(tzinfo=None).isoformat())
-            )
-        bankroll -= bet_size
-        new_alerts += 1
-
-
     cycle_metrics["executed_trades"] = new_alerts
     position_stats = get_open_position_stats()
     cycle_metrics["open_bets"] = position_stats["n_open"]
