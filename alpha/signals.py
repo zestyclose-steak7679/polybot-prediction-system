@@ -45,10 +45,9 @@ def _bounded_quantile(values: list[float], q: float, default: float, low: float,
 
 
 def _safe_price_range(history: pd.DataFrame) -> float:
-    prices = history["yes_price"].to_numpy(dtype=float)
-    if len(prices) == 0:
+    if history is None or history.empty:
         return 0.0
-    return float((prices.max() - prices.min()) / (np.mean(prices) + 1e-6))
+    return max(history['yes_price'].max() - history['yes_price'].min(), 0.0)
 
 
 def _safe_volume_pressure(row: pd.Series, history: pd.DataFrame) -> float:
