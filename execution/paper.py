@@ -23,7 +23,22 @@ def place_paper_bet(signal: Signal, bankroll: float) -> tuple[int | None, float]
     kelly        = kelly_bet(bankroll, signal.confidence, decimal_odds)
     bet_size     = clamp_bet_size(kelly["bet_size"], bankroll)
 
+    # Capital Safety Check
+    open_bets = get_open_bets()
+    allocated = float(open_bets["bet_size"].sum()) if not open_bets.empty else 0.0
+    available = max(0.0, bankroll - allocated)
+    if bet_size > available:
+        logger.warning(f"RISK_BLOCKED: Bet size ${bet_size:.2f} exceeds available capital ${available:.2f}. Clamping.")
+        bet_size = available
+
     if bet_size <= 0:
+        logger.info(f"SIGNAL_SKIPPED: {signal.market_id} - Bet size 0")
+        return None, 0.0
+
+    # Shadow vs Active Separation
+    mode = getattr(signal, "mode", "ACTIVE")
+    if mode == "SHADOW" or getattr(signal, "shadow_only", False):
+        logger.info("SHADOW signal skipped execution")
         return None, 0.0
 
     bet_id = record_paper_bet(
@@ -44,6 +59,7 @@ def place_paper_bet(signal: Signal, bankroll: float) -> tuple[int | None, float]
         f"Paper bet #{bet_id} | {signal.strategy} | {signal.side} "
         f"'{signal.question[:50]}' @ {signal.price:.3f} — ${bet_size:.2f}"
     )
+    logger.info(f"SIGNAL_EXECUTED: #{bet_id} on {signal.market_id}")
     return bet_id, bet_size
 
 
@@ -94,6 +110,7 @@ def settle_open_bets(bankroll: float) -> float:
 
         current_price = row["yes_price"] if bet["side"] == "YES" else row["no_price"]
         close_bet(bet["id"], current_price, result, pnl)
+        logger.info(f"SIGNAL_EVALUATED: bet #{bet['id']} evaluated as {result.upper()} with P&L {pnl:.2f}")
         logger.info(f"Settled bet #{bet['id']} [{bet['strategy_tag']}]: {result.upper()} | P&L ${pnl:+.2f}")
 
     return bankroll

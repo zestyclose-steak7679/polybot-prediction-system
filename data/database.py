@@ -78,6 +78,8 @@ def init_db():
             exit_price REAL, closing_price REAL,
             pnl REAL, roi REAL, clv REAL, closed_at TEXT,
             price_5m REAL, price_15m REAL, price_60m REAL,
+
+
             clv_5m REAL, clv_15m REAL, clv_60m REAL
         );
         CREATE TABLE IF NOT EXISTS market_log (
@@ -496,7 +498,7 @@ def get_open_positions_detail() -> pd.DataFrame:
                 FROM paper_bets pb
                 LEFT JOIN (
                     SELECT market_id, yes_price,
-                           ROW_NUMBER() OVER (PARTITION BY market_id ORDER BY ts DESC) as rn
+                           ROW_NUMBER() OVER (PARTITION BY market_id ORDER BY logged_at DESC) as rn
                     FROM price_history
                 ) ph ON pb.market_id = ph.market_id AND ph.rn = 1
                 WHERE pb.result = 'open'

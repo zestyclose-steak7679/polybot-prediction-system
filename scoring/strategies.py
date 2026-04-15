@@ -84,6 +84,7 @@ def momentum_strategy(row: Mapping[str, Any]) -> Signal | None:
         else:
             return None
 
+    logger.info(f"SIGNAL_GENERATED: on {row['market_id']} for {side}")
     return Signal(
         strategy     = "momentum",
         market_id    = row["market_id"],
@@ -136,6 +137,7 @@ def reversal_strategy(row: Mapping[str, Any]) -> Signal | None:
     if edge < EDGE_THRESHOLD:
         return None
 
+    logger.info(f"SIGNAL_GENERATED: on {row['market_id']} for {side}")
     return Signal(
         strategy     = "reversal",
         market_id    = row["market_id"],
@@ -199,6 +201,7 @@ def volume_spike_strategy(row: Mapping[str, Any]) -> Signal | None:
         else:
             return None
 
+    logger.info(f"SIGNAL_GENERATED: on {row['market_id']} for {side}")
     return Signal(
         strategy     = "volume_spike",
         market_id    = row["market_id"],

@@ -39,8 +39,10 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BANKROLL: ${{ secrets.BANKROLL }}
 
       - name: Save state cache
+        if: always()
         uses: actions/cache@v4
         with:
           path: |
