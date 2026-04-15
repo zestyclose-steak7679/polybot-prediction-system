@@ -28,8 +28,8 @@ jobs:
             regime_state.json
             models/edge_model.pkl
             models/regime_kmeans.pkl
-          key: polybot-state-v2
-          restore-keys: polybot-state-v2
+          key: polybot-state-v3-${{ github.run_id }}
+          restore-keys: polybot-state-v3-
 
       - name: Install dependencies
         run: pip install -r requirements.txt
@@ -54,4 +54,4 @@ jobs:
             regime_state.json
             models/edge_model.pkl
             models/regime_kmeans.pkl
-          key: polybot-state-v2
+          key: polybot-state-v3-${{ github.run_id }}
