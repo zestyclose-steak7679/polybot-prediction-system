@@ -374,16 +374,10 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
                 sig.confidence = round(ep, 4)
                 sig.edge       = round(ep - sig.price, 4)
 
-            if not edge_model.is_trained and not clv_model.is_trained:
-                # Models not ready — use raw heuristic edge
-                if sig.edge >= EDGE_THRESHOLD:
-                    enhanced.append(sig)
-                continue
-
             mw = meta_w.get(sig.strategy, 1/max(len(routed),1))
 
-            # Cold-start bypass: if no models are trained, use raw edge directly
             if not edge_model.is_trained and not clv_model.is_trained:
+                # Models not ready — pass raw heuristic edge directly
                 if sig.edge >= EDGE_THRESHOLD:
                     enhanced.append(sig)
                 continue
@@ -394,7 +388,6 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
                             + 0.15 * mw * sig.edge
                             + 0.10 * sw * sig.edge)
             else:
-
                 combined = (0.60 * sig.edge
                             + 0.25 * mw * sig.edge
                             + 0.15 * sw * sig.edge)

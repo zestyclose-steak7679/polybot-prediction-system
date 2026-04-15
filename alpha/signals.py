@@ -35,7 +35,7 @@ def _is_early_stage(min_bets: int = 30) -> bool:
     except Exception:
         return True
 
-MIN_HISTORY_REQUIRED = 10 if _is_early_stage() else 20
+MIN_HISTORY_REQUIRED = 20
 
 
 def _bounded_quantile(values: list[float], q: float, default: float, low: float, high: float) -> float:
