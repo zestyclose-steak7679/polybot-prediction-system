@@ -469,7 +469,7 @@ def get_open_positions_detail() -> pd.DataFrame:
                 FROM paper_bets pb
                 LEFT JOIN (
                     SELECT market_id, yes_price,
-                           ROW_NUMBER() OVER (PARTITION BY market_id ORDER BY ts DESC) as rn
+                           ROW_NUMBER() OVER (PARTITION BY market_id ORDER BY logged_at DESC) as rn
                     FROM price_history
                 ) ph ON pb.market_id = ph.market_id AND ph.rn = 1
                 WHERE pb.result = 'open'

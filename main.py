@@ -75,6 +75,7 @@ from alerts.telegram      import (send_pick_alert, send_summary,
                                   send_weekly_report, send_positions_update)
 from strategies.router    import StrategyRouter
 
+_LAST_HISTORY_ALERT = None
 BANKROLL_FILE = Path("bankroll.txt")
 router = StrategyRouter()
 
@@ -176,7 +177,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         logger.warning(f"Feature drift detected → size multiplier {drift_mult:.2f}")
 
     # 5. Fetch + filter
-    raw_df = fetch_markets().head(100)
+    raw_df = fetch_markets()
     cycle_metrics["raw_markets"] = len(raw_df)
     logger.info("Raw markets fetched: %s", len(raw_df))
     if raw_df.empty:
@@ -230,6 +231,11 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     logger.info(f"Markets with sufficient history: {len(feature_map)}")
     if not feature_map:
+        global _LAST_HISTORY_ALERT
+        now = time.time()
+        if _LAST_HISTORY_ALERT is None or (now - _LAST_HISTORY_ALERT) > 1800:
+            send_error("⚠️ POLYBOT: 0 markets with sufficient price history. Cycle skipped. Check data pipeline.")
+            _LAST_HISTORY_ALERT = now
         logger.info("Waiting for more price history before generating feature-driven signals.")
         save_bankroll(bankroll)
         return bankroll
