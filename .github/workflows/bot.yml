@@ -26,6 +26,7 @@ jobs:
             last_train.txt
             killed_strategies.json
             regime_state.json
+            last_weekly.txt
             models/edge_model.pkl
             models/regime_kmeans.pkl
           key: polybot-state-v3-${{ github.run_id }}
@@ -52,6 +53,7 @@ jobs:
             last_train.txt
             killed_strategies.json
             regime_state.json
+            last_weekly.txt
             models/edge_model.pkl
             models/regime_kmeans.pkl
           key: polybot-state-v3-${{ github.run_id }}

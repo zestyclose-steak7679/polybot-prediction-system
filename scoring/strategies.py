@@ -47,6 +47,7 @@ class Signal:
     volume:      float
     one_day_change: float
     end_date:    str
+    mode:        str = "SHADOW"
 
 
 # ── Strategy 1: Momentum ──────────────────────────────────

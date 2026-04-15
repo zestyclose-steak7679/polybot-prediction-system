@@ -39,6 +39,7 @@ class ExecutionEngine:
         struct_logger.info("VALIDATED", market_id, "success", {"mode": mode})
 
         if mode == "SHADOW":
+            signal.mode = "SHADOW"
             struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
             self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
             # Note: We might still want to record the bet to track its CLV later,
@@ -48,6 +49,7 @@ class ExecutionEngine:
             return None, "shadow"
 
         # ACTIVE MODE
+        signal.mode = "ACTIVE"
         retries = 3
         for attempt in range(1, retries + 1):
             try:
