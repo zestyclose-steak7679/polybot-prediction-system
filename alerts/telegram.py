@@ -158,10 +158,25 @@ def send_summary(
     timeout_closed = cycle_metrics.get("timeout_closed_this_cycle", 0)
 
     # Strategies
+    from risk.strategy_killer import _load_killed
+    from config import STRATEGY_MIN_ROI
+    killed_log = _load_killed()
+
     strat_items = []
     for s in strategy_stats:
-        status_emoji = "✅" if s["strategy"] in active_strategies else "❌"
-        strat_items.append(f"{status_emoji} {s['strategy']}")
+        if s["strategy"] in active_strategies:
+            strat_items.append(f"✅ {s['strategy']}")
+        else:
+            reason = killed_log.get(s["strategy"], {}).get("reason") if isinstance(killed_log.get(s["strategy"]), dict) else None
+            # If strategy is disabled by tracker.py instead of killer, it won't have a reason in killed_log
+            if not reason:
+                roi_val = s.get("roi")
+                if roi_val is not None and roi_val < STRATEGY_MIN_ROI:
+                    reason = f"ROI {roi_val*100:.1f}% < {STRATEGY_MIN_ROI*100:.0f}%"
+                else:
+                    reason = "disabled"
+            strat_items.append(f"❌ {s['strategy']} ({reason})")
+
     strat_line = "    | ".join(strat_items)
 
     # Alpha Shadow
@@ -174,10 +189,17 @@ def send_summary(
 
     regime = clv_stats.get("regime", "N/A")
 
+    raw_signals = cycle_metrics.get("raw_signals", 0)
+    blocked_by_threshold = cycle_metrics.get("blocked_by_threshold", 0)
+    blocked_by_risk = cycle_metrics.get("blocked_by_risk", 0)
+    executed_trades = cycle_metrics.get("executed_trades", 0)
+    signal_breakdown = f"{raw_signals} raw | {blocked_by_threshold} no edge | {blocked_by_risk} risk blocked | {executed_trades} executed"
+
     text = (
         f"📊 POLYBOT SUMMARY\n"
         f"🕐 {_utc_now().strftime('%Y-%m-%d %H:%M UTC')}\n"
-        f"💰 Bankroll: ${bankroll:,.2f}  |  New signals: {picks_count}\n\n"
+        f"💰 Bankroll: ${bankroll:,.2f}\n"
+        f"🔍 Signals: {signal_breakdown}\n\n"
         f"── PERFORMANCE ──\n"
         f"Bets: {total_bets}  |  W/L: {wins}/{losses}  |  Win rate: {win_rate:.1f}%\n"
         f"ROI: {pnl_sign}{roi:.2f}%  |  P&L: {pnl_sign}${pnl:.2f}\n"
