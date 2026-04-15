@@ -145,6 +145,21 @@ def init_db():
             bankroll_at_entry REAL,
             bankroll_at_exit REAL
         );
+        CREATE TABLE IF NOT EXISTS decision_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            market_id TEXT,
+            agent_id TEXT,
+            decision TEXT,
+            reason TEXT,
+            confidence REAL,
+            bet_size_before REAL,
+            bet_size_after REAL,
+            timestamp TEXT,
+            clv_5m REAL,
+            clv_15m REAL,
+            clv_60m REAL,
+            decision_quality_score REAL
+        );
         CREATE INDEX IF NOT EXISTS idx_pb_strategy ON paper_bets(strategy_tag);
         CREATE INDEX IF NOT EXISTS idx_pb_result ON paper_bets(result);
         CREATE INDEX IF NOT EXISTS idx_alpha_market ON alpha_signals(market_id, cycle_ts);
@@ -507,3 +522,47 @@ def get_open_positions_detail() -> pd.DataFrame:
     except Exception as e:
         logger.error("get_open_positions_detail failed: %s", e)
         return pd.DataFrame()
+
+def record_decision(
+    market_id: str,
+    agent_id: str,
+    decision: str,
+    reason: str,
+    confidence: float,
+    bet_size_before: float,
+    bet_size_after: float
+):
+    try:
+        ts = datetime.now(UTC).replace(tzinfo=None).isoformat()
+        with get_db_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO decision_log
+                (market_id, agent_id, decision, reason, confidence, bet_size_before, bet_size_after, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (market_id, agent_id, decision, reason, confidence, bet_size_before, bet_size_after, ts)
+            )
+    except Exception as e:
+        logger.error(f"Error logging decision for {market_id}: {e}")
+
+def get_unscored_decisions() -> pd.DataFrame:
+    query = """
+        SELECT * FROM decision_log
+        WHERE decision_quality_score IS NULL
+    """
+    return query_to_df(query)
+
+def update_decision_score(decision_id: int, clv_5m: float, clv_15m: float, clv_60m: float, score: float):
+    try:
+        with get_db_connection() as conn:
+            conn.execute(
+                """
+                UPDATE decision_log
+                SET clv_5m = ?, clv_15m = ?, clv_60m = ?, decision_quality_score = ?
+                WHERE id = ?
+                """,
+                (clv_5m, clv_15m, clv_60m, score, decision_id)
+            )
+    except Exception as e:
+        logger.error(f"Error updating decision score for {decision_id}: {e}")

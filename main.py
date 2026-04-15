@@ -70,6 +70,7 @@ from learning.adaptation import adaptation_engine
 from risk.controls        import run_all_checks
 from risk.strategy_killer import get_killed_strategies, revive_eligible_strategies
 from risk.drawdown_controller import get_size_multiplier
+from meta.decision_engine import DecisionEngine
 from alerts.telegram      import (send_pick_alert, send_summary,
                                   send_risk_halt, send_startup, send_error,
                                   send_weekly_report, send_positions_update)
@@ -143,6 +144,13 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             settlement_stats["returned_capital"],
             settlement_stats["avg_clv_closed"],
         )
+
+    # 1.5 Evaluate Decision Quality
+    try:
+        from learning.decision_evaluator import process_decision_evaluations
+        process_decision_evaluations()
+    except Exception as e:
+        logger.error(f"Error during decision evaluation: {e}")
 
     position_stats = get_open_position_stats()
     cycle_metrics["open_bets"] = position_stats["n_open"]
@@ -419,8 +427,35 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     sizes_list  = [a["bet_size"] * total_mult * getattr(a["signal"], "adaptive_multiplier", 1.0) for a in allocations]
     sizes_list  = apply_risk_constraints(sigs_list, sizes_list, bankroll)
     cycle_metrics["blocked_by_risk"] = max(len(enhanced) - sum(1 for size in sizes_list if size > 0), 0)
+
+    # 13.5 Meta Decision Engine Evaluates Trades
+    decision_engine = DecisionEngine()
+    sstats  = get_all_strategy_stats()
+    agent_metrics = {s["strategy"]: s for s in sstats}
+    risk_state = {"is_reduced": dd_mult < 1.0}
+    decisions = decision_engine.evaluate_trade(sigs_list, agent_metrics, dom_regime, risk_state)
+
+    from data.database import record_decision
+    for i, dec in enumerate(decisions):
+        if dec["action"] == "SKIP":
+            sizes_list[i] = 0.0
+            logger.info(f"DECISION_ENGINE | {sigs_list[i].market_id} | SKIPPED: {dec['reason']}")
+        elif dec["action"] == "REDUCE":
+            sizes_list[i] *= dec["confidence"]
+            logger.info(f"DECISION_ENGINE | {sigs_list[i].market_id} | REDUCED size by {dec['confidence']}: {dec['reason']}")
+
+        record_decision(
+            market_id=sigs_list[i].market_id,
+            agent_id=dec["selected_agent"],
+            decision=dec["action"],
+            reason=dec["reason"],
+            confidence=dec["confidence"],
+            bet_size_before=sizes_list[i] if dec["action"] != "REDUCE" else sizes_list[i] / dec["confidence"],
+            bet_size_after=sizes_list[i]
+        )
+
     logger.info(
-        f"Trade candidates after risk: {sum(1 for size in sizes_list if size > 0)} | "
+        f"Trade candidates after risk and meta decisions: {sum(1 for size in sizes_list if size > 0)} | "
         f"Total exposure: ${sum(sizes_list):.2f}"
     )
 
