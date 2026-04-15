@@ -49,6 +49,10 @@ class DecisionEngine:
                 if other_sig.side != side:
                     has_conflict = True
                 other_clv = agent_metrics.get(other_sig.strategy, {}).get("avg_clv", 0)
+                if other_clv is None:
+                    other_clv = 0
+                if max_clv is None:
+                    max_clv = 0
                 if other_clv > max_clv:
                     max_clv = other_clv
                     best_clv_agent = other_sig.strategy
