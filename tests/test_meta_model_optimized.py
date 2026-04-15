@@ -8,7 +8,7 @@ import sys
 # Mock numpy, pandas, and config before importing MetaModel
 mock_np = MagicMock()
 
-# sys.modules['numpy'] = mock_np
+# # sys.modules['numpy'] = mock_np
 # sys.modules['pandas'] = MagicMock()
 # sys.modules['config'] = MagicMock()
 
@@ -23,22 +23,13 @@ from models.meta_model import MetaModel
 
 class TestMetaModelVectorization(unittest.TestCase):
     def setUp(self):
-        import sys
-        from unittest.mock import patch, MagicMock
-        self.module_patcher = patch.dict(sys.modules, {
-            'numpy': MagicMock(),
-            'pandas': MagicMock(),
-            'config': MagicMock()
-        })
-        self.module_patcher.start()
-
         self.mm = MetaModel()
         self.mm.is_trained = True
         self.mm.model = MagicMock()
         self.mm.strategy_names = ["strat1", "strat2", "strat3"]
 
     def tearDown(self):
-        self.module_patcher.stop()
+        pass
 
     def test_predict_weights_vectorization(self):
         strategy_names = ["strat1", "strat2", "strat3"]
