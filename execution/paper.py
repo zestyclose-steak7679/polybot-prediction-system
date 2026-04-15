@@ -9,6 +9,7 @@ from scoring.engine import kelly_bet
 from risk.controls import clamp_bet_size
 from data.database import record_paper_bet, get_open_bets, close_bet, get_pnl_summary
 from data.markets import fetch_markets
+from tracking.clv import check_mid_prices
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,8 @@ def settle_open_bets(bankroll: float) -> float:
     Settle if market has resolved (price >= 0.95 or <= 0.05).
     Returns updated bankroll.
     """
+    check_mid_prices()
+
     open_bets = get_open_bets()
     if open_bets.empty:
         return bankroll

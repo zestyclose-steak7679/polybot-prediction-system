@@ -84,6 +84,9 @@ class TestEngine(unittest.TestCase):
     # --- score_market Tests ---
     def test_score_market_max_score(self):
 
+        row = {"liquidity": 10**6, "volume": 10**7, "one_day_change": 0.20, "yes_price": 0.5, "no_price": 0.5}
+
+
         row = {
             "liquidity": 10**6,
             "volume": 10**7,
@@ -94,10 +97,14 @@ class TestEngine(unittest.TestCase):
 
         row = pd.Series([10**6, 10**7, 0.20, 0.5, 0.5], index=["liquidity", "volume", "one_day_change", "yes_price", "no_price"])
 
+
         score = score_market(row)
         self.assertAlmostEqual(score, 1.0, places=4)
 
     def test_score_market_min_score(self):
+
+        row = {"liquidity": 0.0, "volume": 0.0, "one_day_change": 0.0, "yes_price": 1.0, "no_price": 0.08}
+
 
         row = {
             "liquidity": 0,
@@ -109,10 +116,14 @@ class TestEngine(unittest.TestCase):
 
         row = pd.Series([0, 0, 0.0, 1.0, 0.08], index=["liquidity", "volume", "one_day_change", "yes_price", "no_price"])
 
+
         score = score_market(row)
         self.assertAlmostEqual(score, 0.0, places=4)
 
     def test_score_market_intermediate(self):
+
+        row = {"liquidity": 1000.0, "volume": 100000.0, "one_day_change": -0.10, "yes_price": 0.75, "no_price": 0.21}
+
         row = {
             "liquidity": 1000,   # 0.5
             "volume": 100000,    # 5/7 = 0.7142857
@@ -126,11 +137,15 @@ class TestEngine(unittest.TestCase):
         # weights = {"liquidity":0.30, "momentum":0.25, "tension":0.20, "efficiency":0.15, "volume_raw":0.10}
 
 
+
         # total expected = 0.5*0.3 + 0.5*0.25 + 0.5*0.2 + 0.5*0.15 + (5/7)*0.10 = 0.15 + 0.125 + 0.1 + 0.075 + 0.07142857 = 0.52142857
         score = score_market(row)
         self.assertAlmostEqual(score, 0.5214, places=4)
 
     def test_score_market_negative_liquidity(self):
+
+        row = {"liquidity": -100.0, "volume": 10**7, "one_day_change": 0.20, "yes_price": 0.5, "no_price": 0.5}
+
 
         row = {
             "liquidity": -100,
@@ -142,12 +157,25 @@ class TestEngine(unittest.TestCase):
 
         row = pd.Series([-100, 10**7, 0.20, 0.5, 0.5], index=["liquidity", "volume", "one_day_change", "yes_price", "no_price"])
 
+
         score = score_market(row)
         # liq score should be 0.
         self.assertAlmostEqual(score, 0.7, places=4)
 
     # --- score_all Tests ---
     def test_score_all(self):
+
+        df = pd.DataFrame({
+            "market_id": ["A", "B"],
+            "liquidity": [0.0, 1000000.0],
+            "volume": [0.0, 10000000.0],
+            "one_day_change": [0.0, 0.20],
+            "yes_price": [1.0, 0.5],
+            "no_price": [0.08, 0.5]
+        })
+        self.assertEqual(len(df.columns), 6)
+        self.assertFalse(df.isnull().any().any())
+
 
         df = pd.DataFrame({
 
@@ -165,6 +193,7 @@ class TestEngine(unittest.TestCase):
 
         }
         df = pd.DataFrame(data)
+
 
         scored_df = score_all(df)
         self.assertEqual(len(scored_df), 2)
@@ -261,6 +290,21 @@ class TestEngine(unittest.TestCase):
     def test_get_top_picks(self):
 
         df = pd.DataFrame({
+            "market_id": ["A", "B"],
+            "question": ["Q1", "Q2"],
+            "tags": ["T1", "T2"],
+            "liquidity": [1000000.0, 0.0],
+            "volume": [10000000.0, 0.0],
+            "one_day_change": [0.20, 0.0],
+            "yes_price": [0.5, 1.0],
+            "no_price": [0.5, 0.08],
+            "end_date": ["2025-01-01", "2025-01-01"]
+        })
+        self.assertEqual(len(df.columns), 9)
+        self.assertFalse(df.isnull().any().any())
+
+
+        df = pd.DataFrame({
 
 
         data = {
@@ -281,6 +325,7 @@ class TestEngine(unittest.TestCase):
         df = pd.DataFrame(data)
 
         df = pd.DataFrame([["A", "Q1", "T1", 10**6, 10**7, 0.20, 0.5, 0.5, "2025-01-01"], ["B", "Q2", "T2", 0, 0, 0, 1.0, 0.08, "2025-01-01"]], columns=["market_id", "question", "tags", "liquidity", "volume", "one_day_change", "yes_price", "no_price", "end_date"])
+
 
         picks = get_top_picks(df, 1000)
         self.assertTrue(len(picks) > 0)

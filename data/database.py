@@ -77,6 +77,9 @@ def init_db():
             result TEXT DEFAULT 'open',
             exit_price REAL, closing_price REAL,
             pnl REAL, roi REAL, clv REAL, closed_at TEXT,
+            price_5m REAL, price_15m REAL, price_60m REAL,
+
+
             clv_5m REAL, clv_15m REAL, clv_60m REAL
         );
         CREATE TABLE IF NOT EXISTS market_log (
@@ -151,6 +154,19 @@ def init_db():
     try:
         with _conn() as con:
             con.executescript(schema)
+            # Check and add columns for db upgrades
+            try:
+                con.execute("ALTER TABLE alpha_signals ADD COLUMN closing_price REAL")
+                con.execute("ALTER TABLE alpha_signals ADD COLUMN resolved_clv REAL")
+                con.execute("ALTER TABLE alpha_signals ADD COLUMN resolution_state TEXT")
+                con.execute("ALTER TABLE alpha_signals ADD COLUMN resolved_at TEXT")
+            except sqlite3.OperationalError:
+                pass
+            for col in ["price_5m", "price_15m", "price_60m", "clv_5m", "clv_15m", "clv_60m"]:
+                try:
+                    con.execute(f"ALTER TABLE paper_bets ADD COLUMN {col} REAL")
+                except sqlite3.OperationalError:
+                    pass
             con.commit()
     except sqlite3.OperationalError as exc:
         if "disk I/O error" not in str(exc):
@@ -312,6 +328,19 @@ def get_recent_alpha_signals(limit: int = 50):
             f"SELECT * FROM alpha_signals ORDER BY cycle_ts DESC LIMIT {limit}",
             con,
         )
+
+def update_mid_price(bet_id: int, period: str, price: float, clv: float):
+    if period not in ("5m", "15m", "60m"):
+        return
+    try:
+        with _conn() as con:
+            con.execute(
+                f"UPDATE paper_bets SET price_{period}=?, clv_{period}=? WHERE id=?",
+                (price, clv, bet_id)
+            )
+            con.commit()
+    except Exception as e:
+        logger.error(f"Error updating mid price for bet {bet_id}: {e}")
 
 def get_open_bets():
     try:

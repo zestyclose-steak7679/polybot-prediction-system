@@ -54,7 +54,7 @@ def compute_strategy_roi(strategy: str, last_n: int = 50) -> dict | None:
             params=(strategy, last_n),
         )
 
-    if len(df) < MIN_BETS_TO_EVAL:
+    if len(df) < 30: # min_sample_size
         return None   # not enough data
 
     total_staked = df["bet_size"].sum()
@@ -85,16 +85,45 @@ def get_active_strategies() -> list[str]:
     active = []
     disabled = []
 
+    # Add update frequency constraint
+    with _conn() as con:
+        total_closed = con.execute("SELECT count(*) FROM paper_bets WHERE result != 'open'").fetchone()[0]
+
+    # We only update active strategies if we hit the update frequency (every 20 trades)
+    # If not hit, we essentially return the current active ones,
+    # but since this function recalculates, we enforce it by returning ACTIVE_STRATEGIES
+    # if total_closed % 20 != 0 and total_closed > 0?
+    # Actually, a better way is to read the last evaluation state.
+    # But to keep it simple and stateless as requested, let's just evaluate
+    # based on the floor of total_closed / 20.
+
     for strategy in ACTIVE_STRATEGIES:
         stats = compute_strategy_roi(strategy)
 
-        if stats is None:
+        if stats is None or stats["n_bets"] < 30: # min_sample_size
             # Not enough data → keep active (benefit of the doubt)
             active.append(strategy)
             logger.info(f"Strategy '{strategy}': not enough data yet — keeping active")
             continue
 
-        if stats["roi"] >= STRATEGY_MIN_ROI:
+        # Enforce update frequency: evaluate on chunks of 20
+        # Instead of recalculating every single trade, we check if n_bets is a multiple of 20
+        # For simplicity in this stateless loop, we let it be active unless it fails the threshold
+        # specifically when evaluating at the 20-trade boundary.
+        # If we want a strict update frequency, we evaluate ROI at the largest multiple of 20
+        # which is handled by passing `last_n = (stats["n_bets"] // 20) * 20` to compute_strategy_roi
+        # We will re-fetch the stats to strictly respect the update frequency of 20 trades.
+        eval_n = (stats["n_bets"] // 20) * 20
+        if eval_n < 30:
+            active.append(strategy)
+            continue
+
+        eval_stats = compute_strategy_roi(strategy, last_n=eval_n)
+        if eval_stats is None:
+            active.append(strategy)
+            continue
+
+        if eval_stats["roi"] >= STRATEGY_MIN_ROI:
             active.append(strategy)
             logger.info(
                 f"Strategy '{strategy}': ROI={stats['roi']*100:.1f}% "

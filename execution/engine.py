@@ -1,0 +1,95 @@
+import logging
+import time
+from typing import Optional, Tuple
+from utils.logger import get_structured_logger
+from alerts.telegram import _send
+from data.database import record_paper_bet
+from scoring.strategies import Signal
+from learning.tracker import compute_strategy_roi
+
+logger = logging.getLogger(__name__)
+struct_logger = get_structured_logger("execution.engine")
+
+class ExecutionEngine:
+    STATES = {"SIGNAL_RECEIVED", "VALIDATED", "EXECUTED", "FAILED", "SHADOW"}
+
+    def __init__(self, bankroll: float):
+        self.bankroll = bankroll
+
+    def _determine_mode(self, strategy: str) -> str:
+        """
+        Check SHADOW vs ACTIVE mode.
+        A signal is ACTIVE if its strategy has positive CLV in shadow mode, else SHADOW.
+        """
+        stats = compute_strategy_roi(strategy)
+        if stats and stats.get("avg_clv") is not None and stats["avg_clv"] > 0:
+            return "ACTIVE"
+        return "SHADOW"
+
+    def execute_signal(self, signal: Signal, bet_size: float, kelly_raw: float, decimal_odds: float) -> Tuple[Optional[int], str]:
+        market_id = signal.market_id
+        struct_logger.info("SIGNAL_RECEIVED", market_id, "pending", {"strategy": signal.strategy, "bet_size": bet_size})
+
+        if bet_size <= 0:
+            struct_logger.info("VALIDATED", market_id, "skipped", {"reason": "zero_bet_size"})
+            self._notify_outcome(signal, "skipped", "Zero bet size")
+            return None, "skipped"
+
+        mode = self._determine_mode(signal.strategy)
+        struct_logger.info("VALIDATED", market_id, "success", {"mode": mode})
+
+        if mode == "SHADOW":
+            struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
+            self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
+            # Note: We might still want to record the bet to track its CLV later,
+            # but let's record it with bet_size 0 or a special tag if needed.
+            # For now, we will execute it but log it as shadow, or maybe not place it.
+            # The prompt says: "signals generated but NOT executed, only logged".
+            return None, "shadow"
+
+        # ACTIVE MODE
+        retries = 3
+        for attempt in range(1, retries + 1):
+            try:
+                bet_id = record_paper_bet(
+                    market_id=market_id,
+                    question=signal.question,
+                    strategy_tag=signal.strategy,
+                    side=signal.side,
+                    entry_price=signal.price,
+                    bet_size=bet_size,
+                    bankroll=self.bankroll,
+                    kelly_raw=kelly_raw,
+                    edge_est=signal.edge,
+                    confidence=signal.confidence,
+                    reason=signal.reason,
+                )
+                if bet_id:
+                    struct_logger.info("EXECUTED", market_id, "success", {
+                        "bet_id": bet_id,
+                        "bet_size": bet_size,
+                        "price": signal.price,
+                        "attempt": attempt
+                    })
+                    self._notify_outcome(signal, "success", f"Placed ${bet_size:.2f} at {signal.price:.2f}")
+                    return bet_id, "success"
+            except Exception as e:
+                struct_logger.warning("EXECUTION_ATTEMPT", market_id, "failed", {
+                    "attempt": attempt,
+                    "error": str(e)
+                })
+                time.sleep(1) # Backoff
+
+        struct_logger.error("FAILED", market_id, "failed", {"reason": "max_retries_exceeded"})
+        self._notify_outcome(signal, "failed", "Execution failed after retries")
+        return None, "failed"
+
+    def _notify_outcome(self, signal: Signal, status: str, details: str):
+        text = (
+            f"🚀 <b>Execution Update</b>\n"
+            f"Market: {signal.market_id}\n"
+            f"Strategy: {signal.strategy}\n"
+            f"Status: {status.upper()}\n"
+            f"Details: {details}"
+        )
+        _send(text)

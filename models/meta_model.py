@@ -11,8 +11,10 @@ import pickle, sqlite3, logging
 import pandas as pd
 from pathlib import Path
 from config import DB_PATH
+from utils.logger import get_structured_logger
 
 logger = logging.getLogger(__name__)
+struct_logger = get_structured_logger("models.meta_model")
 MODEL_PATH  = "models/meta_model.pkl"
 MIN_SAMPLES = 200
 
@@ -96,8 +98,9 @@ class MetaModel:
                 strat: max(float(preds[i]), 0.0)
                 for i, strat in enumerate(strategy_names)
             }
-        except Exception:
-            weights = {strat: 0.0 for strat in strategy_names}
+        except Exception as e:
+            struct_logger.error("meta_model_predict", "all", "failed", {"error": str(e)})
+            raise
 
         # weights = softmax(weights) so they sum to 1
         total = sum(weights.values())

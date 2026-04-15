@@ -10,8 +10,10 @@ import json
 import logging
 import re
 from config import GAMMA_URL, MARKET_LIMIT, TARGET_TAGS
+from utils.logger import get_structured_logger
 
 logger = logging.getLogger(__name__)
+struct_logger = get_structured_logger("data.markets")
 SESSION = requests.Session()
 SESSION.trust_env = False
 MAX_MATCHED_MARKETS = 300
@@ -36,7 +38,7 @@ def _parse_market(m: dict) -> dict | None:
 
         tags = [t.get("slug", "").lower() for t in (m.get("tags") or [])]
 
-        return {
+        parsed = {
             "market_id":        m.get("id", ""),
             "question":         m.get("question", ""),
             "slug":             m.get("slug", ""),
@@ -52,8 +54,10 @@ def _parse_market(m: dict) -> dict | None:
             "active":           m.get("active", False),
             "closed":           m.get("closed", False),
         }
+        struct_logger.info("ingestion", parsed["market_id"], "success", {"action": "parse_market"})
+        return parsed
     except Exception as e:
-        logger.debug(f"Parse error on market {m.get('id')}: {e}")
+        struct_logger.error("ingestion", m.get("id", "unknown"), "failed", {"error": str(e)})
         return None
 
 
@@ -124,7 +128,7 @@ def fetch_markets(tags: list[str] = None) -> pd.DataFrame:
             resp.raise_for_status()
             data = resp.json()
         except requests.RequestException as e:
-            logger.error(f"Gamma API fetch failed: {e}")
+            struct_logger.error("ingestion", "all", "failed", {"error": str(e), "message": "Gamma API fetch failed"})
             return pd.DataFrame()
 
         if not data:

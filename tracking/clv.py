@@ -11,7 +11,7 @@ import sqlite3
 import os as _os
 _DB_PATH = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "polybot.db")
 from config import MAX_POSITION_AGE_HOURS
-from data.database import get_open_bets, close_bet, get_closed_bets
+from data.database import get_open_bets, close_bet, get_closed_bets, update_mid_price
 from data.markets import fetch_single_market
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,57 @@ def compute_clv(entry_price: float, closing_price: float, direction: int) -> flo
         return None
     return round((closing_price - entry_price) * direction, 5)
 
+def check_mid_prices():
+    """Check open bets and capture mid prices for 5m, 15m, 60m horizons."""
+    open_bets = get_open_bets()
+    if open_bets.empty:
+        return
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+
+    # We group by market_id to minimize API calls
+    markets_to_fetch = set()
+    for _, bet in open_bets.iterrows():
+        try:
+            placed_at = datetime.fromisoformat(str(bet["placed_at"]).replace("Z", "").split("+")[0])
+            mins_open = (now - placed_at).total_seconds() / 60.0
+        except Exception:
+            continue
+
+        if (mins_open >= 5 and pd.isna(bet.get("price_5m"))) or \
+           (mins_open >= 15 and pd.isna(bet.get("price_15m"))) or \
+           (mins_open >= 60 and pd.isna(bet.get("price_60m"))):
+           markets_to_fetch.add(bet["market_id"])
+
+    if not markets_to_fetch:
+        return
+
+    market_cache = {}
+    for mid in markets_to_fetch:
+        mdata = fetch_single_market(mid)
+        if mdata:
+            market_cache[mid] = mdata
+
+    for _, bet in open_bets.iterrows():
+        market_id = bet["market_id"]
+        if market_id not in market_cache:
+            continue
+
+        try:
+            placed_at = datetime.fromisoformat(str(bet["placed_at"]).replace("Z", "").split("+")[0])
+            mins_open = (now - placed_at).total_seconds() / 60.0
+        except Exception:
+            continue
+
+        mdata = market_cache[market_id]
+        current_price = mdata["yes_price"]
+        direction = 1 if bet["side"] == "YES" else -1
+
+        for period, threshold in [("5m", 5), ("15m", 15), ("60m", 60)]:
+            if mins_open >= threshold and pd.isna(bet.get(f"price_{period}")):
+                clv = compute_clv(bet["entry_price"], current_price, direction)
+                if clv is not None:
+                    update_mid_price(bet["id"], period, current_price, clv)
 
 def _hours_to_resolution(end_date_str: str) -> float:
     try:

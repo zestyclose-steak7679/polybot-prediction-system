@@ -3,12 +3,15 @@ import unittest
 from unittest.mock import MagicMock, patch
 import sys
 
+
+
 # Mock numpy, pandas, and config before importing MetaModel
 mock_np = MagicMock()
 
 # sys.modules['numpy'] = mock_np
 # sys.modules['pandas'] = MagicMock()
 # sys.modules['config'] = MagicMock()
+
 
 
 
@@ -32,6 +35,7 @@ class TestMetaModelVectorization(unittest.TestCase):
         self.mm = MetaModel()
         self.mm.is_trained = True
         self.mm.model = MagicMock()
+        self.mm.strategy_names = ["strat1", "strat2", "strat3"]
 
     def tearDown(self):
         self.module_patcher.stop()
@@ -48,10 +52,8 @@ class TestMetaModelVectorization(unittest.TestCase):
         }
 
         # Mock model.predict to return some values
+        self.mm.is_trained = True
         self.mm.model.predict.return_value = [0.1, 0.2, 0.3]
-
-        # We need to mock numpy.array to return something manageable for our test logic
-        # OR we just let it be a MagicMock and check how it was called.
 
         weights = self.mm.predict_weights(feats, strategy_names)
 
@@ -59,10 +61,18 @@ class TestMetaModelVectorization(unittest.TestCase):
         self.mm.model.predict.assert_called_once()
 
         # Check output structure
+        self.assertIsInstance(weights, dict)
         self.assertEqual(len(weights), 3)
         self.assertIn("strat1", weights)
         self.assertIn("strat2", weights)
         self.assertIn("strat3", weights)
+
+        # Check properties
+        self.assertTrue(abs(sum(weights.values()) - 1.0) < 1e-6)
+        for w in weights.values():
+            self.assertTrue(0 <= w <= 1.0)
+
+        # Check explicit output mapping matches real numpy logic
 
 
         # Check normalized weights via softmax (0.1, 0.2, 0.3)
@@ -76,6 +86,7 @@ class TestMetaModelVectorization(unittest.TestCase):
         self.assertAlmostEqual(weights["strat1"], expected_softmax[0])
         self.assertAlmostEqual(weights["strat2"], expected_softmax[1])
         self.assertAlmostEqual(weights["strat3"], expected_softmax[2])
+
 
         # Check normalized weights (0.1, 0.2, 0.3 -> sum=0.6 -> 1/6, 2/6, 3/6)
         # weights = softmax([0.1, 0.2, 0.3])
@@ -102,11 +113,8 @@ class TestMetaModelVectorization(unittest.TestCase):
         # Force an exception in predict
         self.mm.model.predict.side_effect = Exception("Predict failed")
 
-        weights = self.mm.predict_weights(feats, strategy_names)
-
-        # Should fallback to equal weights (0.5 each)
-        self.assertEqual(weights["strat1"], 0.5)
-        self.assertEqual(weights["strat2"], 0.5)
+        with self.assertRaises(Exception):
+            self.mm.predict_weights(feats, strategy_names)
 
 if __name__ == "__main__":
     unittest.main()

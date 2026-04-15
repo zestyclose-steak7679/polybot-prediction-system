@@ -5,9 +5,25 @@ Hard filters — markets that fail these are dropped before scoring.
 
 import pandas as pd
 import logging
+from datetime import UTC, datetime
 from config import MIN_LIQUIDITY, MIN_VOLUME, MIN_PRICE, MAX_PRICE
+from utils.logger import get_structured_logger
+from data.price_history import get_history_bulk
 
 logger = logging.getLogger(__name__)
+struct_logger = get_structured_logger("scoring.filters")
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+def _is_stale(end_date_str: str) -> bool:
+    if not end_date_str:
+        return False
+    try:
+        end = datetime.fromisoformat(str(end_date_str).replace("Z", "").split("+")[0])
+        return end < _utc_now()
+    except Exception:
+        return False
 
 
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
@@ -35,6 +51,47 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     df = df[df["yes_price"] <= MAX_PRICE]
     df = df[df["active"] == True]   # noqa: E712
     df = df[df["closed"] == False]  # noqa: E712
+
+    # Validation Layer
+    valid_indices = []
+
+    market_ids = df["market_id"].tolist()
+    histories = get_history_bulk(market_ids, last_n=10)
+
+    for idx, row in df.iterrows():
+        market_id = row["market_id"]
+
+        # 1. Stale market check
+        if _is_stale(row.get("end_date")):
+            struct_logger.warning("data_validation", market_id, "skipped", {"reason": "stale_market"})
+            continue
+
+        # 2. Price continuity check
+        history_df = histories.get(market_id)
+        if history_df is not None and not history_df.empty:
+            current_price = row["yes_price"]
+            prev_price = history_df["yes_price"].iloc[-1]
+            price_change = abs(current_price - prev_price)
+
+            if len(history_df) >= 2:
+                # Calculate rolling std over available history
+                rolling_std = history_df["yes_price"].std()
+                if pd.isna(rolling_std):
+                    rolling_std = 0.0
+            else:
+                rolling_std = 0.0
+
+            if price_change > max(0.15, 3 * rolling_std):
+                struct_logger.warning("data_validation", market_id, "skipped", {
+                    "reason": "price_jump",
+                    "price_change": price_change,
+                    "rolling_std": rolling_std
+                })
+                continue
+
+        valid_indices.append(idx)
+
+    df = df.loc[valid_indices]
 
     after = len(df)
     logger.info(f"Filters: {before} → {after} markets (dropped {before - after} markets due to filters)")
