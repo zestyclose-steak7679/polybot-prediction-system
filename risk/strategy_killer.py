@@ -54,8 +54,17 @@ def get_killed_strategies() -> set:
     killed = set()
 
     # Clear cooldowns that have expired
-    expired = [k for k, ts in killed_log.items()
-               if now - datetime.fromisoformat(ts) > timedelta(hours=COOLDOWN_HOURS)]
+    expired = []
+    for k, val in killed_log.items():
+        # Handle both old format (string timestamp) and new format (dict)
+        ts_str = val["timestamp"] if isinstance(val, dict) else val
+        try:
+            ts = datetime.fromisoformat(ts_str)
+            if now - ts > timedelta(hours=COOLDOWN_HOURS):
+                expired.append(k)
+        except Exception:
+            expired.append(k) # Remove invalid entries
+
     for k in expired:
         del killed_log[k]
         logger.info(f"Strategy re-enabled after cooldown: {k}")
@@ -88,9 +97,13 @@ def get_killed_strategies() -> set:
             avg_clv = float(clv_data.mean())
             if avg_clv < CLV_KILL_THRESHOLD:
                 killed.add(strat)
-                killed_log[strat] = now.isoformat()
+                reason_str = f"avg CLV {avg_clv:.5f} < {CLV_KILL_THRESHOLD}"
+                killed_log[strat] = {
+                    "timestamp": now.isoformat(),
+                    "reason": reason_str
+                }
                 logger.warning(
-                    f"Strategy KILLED: {strat} | rolling avg CLV={avg_clv:.5f} "
+                    f"Strategy KILLED: {strat} | {reason_str} "
                     f"over {len(clv_data)} bets | cooldown {COOLDOWN_HOURS}h"
                 )
 
