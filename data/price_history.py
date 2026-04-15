@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 def _conn():
     is_uri = isinstance(DB_PATH, str) and DB_PATH.startswith("file:")
     con = sqlite3.connect(DB_PATH, uri=is_uri)
-    con.execute("PRAGMA journal_mode=MEMORY")
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=NORMAL")
     con.execute("PRAGMA temp_store=MEMORY")
     return con
 

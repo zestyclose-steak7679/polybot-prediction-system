@@ -20,9 +20,9 @@ def _conn():
     if is_uri and "mode=memory" in DB_PATH and _MEMORY_ANCHOR is None:
         _MEMORY_ANCHOR = sqlite3.connect(DB_PATH, uri=True)
     con = sqlite3.connect(DB_PATH, uri=is_uri)
-    con.execute("PRAGMA journal_mode=MEMORY")
-    con.execute("PRAGMA temp_store=MEMORY")
+    con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA synchronous=NORMAL")
+    con.execute("PRAGMA temp_store=MEMORY")
     return con
 
 
@@ -49,9 +49,9 @@ def _rebind_db_path(new_path: str):
         pass
     if isinstance(new_path, str) and new_path.startswith("file:") and "mode=memory" in new_path:
         _MEMORY_ANCHOR = sqlite3.connect(new_path, uri=True)
-        _MEMORY_ANCHOR.execute("PRAGMA journal_mode=MEMORY")
-        _MEMORY_ANCHOR.execute("PRAGMA temp_store=MEMORY")
+        _MEMORY_ANCHOR.execute("PRAGMA journal_mode=WAL")
         _MEMORY_ANCHOR.execute("PRAGMA synchronous=NORMAL")
+        _MEMORY_ANCHOR.execute("PRAGMA temp_store=MEMORY")
     for module_name, module in list(sys.modules.items()):
         if not module_name.startswith(("data.", "models.", "learning.", "backtest.", "dashboard.", "risk.", "tracking.")):
             continue
