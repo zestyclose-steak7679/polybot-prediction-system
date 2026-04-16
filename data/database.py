@@ -408,10 +408,13 @@ def get_closed_bets(limit=500):
         return pd.DataFrame()
 
 def get_pnl_summary():
+    with _conn() as con:
+        total_bets = con.execute("SELECT COUNT(*) FROM paper_bets").fetchone()[0]
+
     rows = get_closed_bets()
     if rows.empty:
         return {
-            "total_bets": 0,
+            "total_bets": total_bets,
             "wins": 0,
             "losses": 0,
             "total_pnl": 0.0,
@@ -424,11 +427,11 @@ def get_pnl_summary():
     wins = rows["result"].isin(["win", "timeout_win"])
     losses = rows["result"].isin(["loss", "timeout_loss"])
     clv_resolved = rows["clv"].notna()
-    total = len(rows)
+    total_closed = len(rows)
     wins_count = int(wins.sum())
-    win_rate = (wins_count / total * 100) if total > 0 else 0.0
+    win_rate = (wins_count / total_closed * 100) if total_closed > 0 else 0.0
     return {
-        "total_bets": total,
+        "total_bets": total_bets,
         "wins":       wins_count,
         "losses":     int(losses.sum()),
         "total_pnl":  round(rows["pnl"].sum(), 2),
