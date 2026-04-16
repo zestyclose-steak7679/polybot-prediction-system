@@ -22,9 +22,21 @@ class ExecutionEngine:
         A signal is ACTIVE if its strategy has positive CLV in shadow mode, else SHADOW.
         """
         stats = compute_strategy_roi(strategy)
-        if stats and stats.get("avg_clv") is not None and stats["avg_clv"] > 0:
-            return "ACTIVE"
-        return "SHADOW"
+
+        if stats is None:
+            struct_logger.info("PROMOTION", "unknown", "skipped", {"strategy": strategy, "reason": "insufficient_data"})
+            return "SHADOW"
+
+        avg_clv = stats.get("avg_clv")
+        if avg_clv is None:
+            struct_logger.info("PROMOTION", "unknown", "skipped", {"strategy": strategy, "reason": "no_clv_data"})
+            return "SHADOW"
+
+        if avg_clv <= -0.05:
+            struct_logger.info("PROMOTION", "unknown", "skipped", {"strategy": strategy, "reason": "negative_clv", "avg_clv": avg_clv})
+            return "SHADOW"
+
+        return "ACTIVE"
 
     def execute_signal(self, signal: Signal, bet_size: float, kelly_raw: float, decimal_odds: float) -> Tuple[Optional[int], str]:
         market_id = signal.market_id
