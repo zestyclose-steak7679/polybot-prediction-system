@@ -1,6 +1,8 @@
 # Runtime databases
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # Runtime state
 bankroll.txt
@@ -9,6 +11,7 @@ last_train.txt
 regime_state.json
 killed_strategies.json
 daily_benchmarks.json
+last_weekly.txt
 
 # Logs and models
 logs/
@@ -23,4 +26,3 @@ __pycache__/
 commit_helper.sh
 plan.md
 test_task4.py
-logs/
