@@ -97,6 +97,27 @@ def compute_confidence(signal, market_row, history_df) -> float:
     return round(float(np.clip(confidence, 0.0, 1.0)), 4)
 
 
+def confidence_multiplier(confidence: float) -> float:
+    """
+    Maps confidence score to bet size multiplier.
+    Conservative scaling — never bet more than 1.5x base,
+    never less than 0.5x base.
+    """
+    if confidence is None:
+        return 1.0  # default: no adjustment
+    confidence = max(0.0, min(1.0, confidence))
+    if confidence >= 0.75:
+        return 1.5
+    elif confidence >= 0.60:
+        return 1.25
+    elif confidence >= 0.45:
+        return 1.0
+    elif confidence >= 0.30:
+        return 0.75
+    else:
+        return 0.5
+
+
 # ── Main scoring ──────────────────────────────────────────────────────────────
 
 WEIGHTS = {
