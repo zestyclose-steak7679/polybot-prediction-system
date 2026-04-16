@@ -46,13 +46,19 @@ class DecisionEngine:
             if max_clv is None:
                 max_clv = 0
 
+            max_clv = float(agent_metrics.get(agent_id, {}).get("avg_clv") or 0)
+
             for other_sig in market_group:
                 conflicting_agents.append(other_sig.strategy)
                 if other_sig.side != side:
                     has_conflict = True
+
                 other_clv = agent_metrics.get(other_sig.strategy, {}).get("avg_clv", 0)
                 if other_clv is None:
                     other_clv = 0
+
+                other_clv = float(agent_metrics.get(other_sig.strategy, {}).get("avg_clv") or 0)
+
                 if other_clv > max_clv:
                     max_clv = other_clv
                     best_clv_agent = other_sig.strategy

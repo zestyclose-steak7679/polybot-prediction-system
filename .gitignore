@@ -4,8 +4,11 @@
 *.db-shm
 
 # Runtime state
+
 # (bankroll.txt, killed_strategies.json etc are tracked intentionally
 #  so the "Persist state" git-push step can commit them)
+
+
 
 # Logs and models
 logs/
@@ -20,3 +23,7 @@ __pycache__/
 commit_helper.sh
 plan.md
 test_task4.py
+
+
+logs/
+polybot.db*

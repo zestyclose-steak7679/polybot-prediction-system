@@ -49,6 +49,20 @@ jobs:
           BANKROLL: ${{ secrets.BANKROLL }}
 
       - name: Persist state
+
+        if: always()
+        run: |
+          git config user.name "polybot"
+          git config user.email "bot@polybot"
+          git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json || true
+          git add daily_benchmarks.json last_weekly.txt || true
+          git diff --staged --quiet || git commit -m "chore: state [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save state cache
+
         if: always()
         run: |
           git config user.name "polybot"
