@@ -520,6 +520,14 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     sstats  = get_all_strategy_stats()
     cycle_metrics["alpha_resolved_total"] = sum(alpha["n"] for alpha in alpha_stats) if alpha_stats else 0
     mmode = model_mode()
+
+    try:
+        from learning.benchmarks import load_benchmarks
+        benchmark_data = load_benchmarks()
+    except Exception as e:
+        logger.error(f"Error loading benchmarks for summary: {e}")
+        benchmark_data = None
+
     send_summary(
         stats,
         sstats,
@@ -531,6 +539,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         position_stats=position_stats,
         cycle_metrics=cycle_metrics,
         clv_stats=clv,
+        benchmark_data=benchmark_data,
     )
 
     if clv["n"] > 0:

@@ -128,6 +128,7 @@ def send_summary(
     position_stats: dict | None = None,
     cycle_metrics: dict | None = None,
     clv_stats: dict | None = None,
+    benchmark_data: dict | None = None,
 ):
     token, chat_id = _get_credentials()
     if not token or not chat_id:
@@ -140,7 +141,11 @@ def send_summary(
     clv_stats = clv_stats or {}
 
     # Performance
-    total_bets = stats.get('total_bets', 0)
+    total_bets = (
+        benchmark_data.get('bets_today', 0)
+        if benchmark_data
+        else stats.get('total_bets', 0)
+    )
     wins = stats.get('wins', 0)
     losses = stats.get('losses', 0)
     win_rate = stats.get('win_rate', 0.0)
