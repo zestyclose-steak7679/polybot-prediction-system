@@ -1,7 +1,14 @@
 # Runtime databases
+*.db
 *.db-journal
 
 # Runtime state
+bankroll.txt
+peak_bankroll.txt
+last_train.txt
+regime_state.json
+killed_strategies.json
+daily_benchmarks.json
 
 # Logs and models
 logs/
@@ -17,4 +24,3 @@ commit_helper.sh
 plan.md
 test_task4.py
 logs/
-polybot.db*
