@@ -1,17 +1,11 @@
 # Runtime databases
-*.db
 *.db-journal
 *.db-wal
 *.db-shm
 
 # Runtime state
-bankroll.txt
-peak_bankroll.txt
-last_train.txt
-regime_state.json
-killed_strategies.json
-daily_benchmarks.json
-last_weekly.txt
+# (bankroll.txt, killed_strategies.json etc are tracked intentionally
+#  so the "Persist state" git-push step can commit them)
 
 # Logs and models
 logs/
