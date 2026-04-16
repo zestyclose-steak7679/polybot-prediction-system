@@ -400,8 +400,11 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             continue
 
     avg_enhanced_edge = float(np.mean([sig.edge for sig in enhanced])) if enhanced else 0.0
+    valid_confs = [sig.confidence for sig in enhanced if getattr(sig, "confidence", None) is not None]
+    avg_confidence = float(np.mean(valid_confs)) if valid_confs else None
     cycle_metrics["enhanced_signals"] = len(enhanced)
     cycle_metrics["blocked_by_threshold"] = max(len(signals) - len(enhanced), 0)
+    cycle_metrics["avg_confidence"] = avg_confidence
     logger.info(f"Enhanced signals: {len(enhanced)} | Avg edge: {avg_enhanced_edge:.4f}")
 
     # 12. Drawdown + drift multipliers
