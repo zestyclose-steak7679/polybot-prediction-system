@@ -540,6 +540,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         cycle_metrics=cycle_metrics,
         clv_stats=clv,
         benchmark_data=benchmark_data,
+        tracker_active=base_active,
     )
 
     if clv["n"] > 0:
