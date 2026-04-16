@@ -515,6 +515,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     # 15. Summary
     clv     = clv_report()
+    clv["regime"] = dom_regime
     stats   = get_pnl_summary()
     sstats  = get_all_strategy_stats()
     cycle_metrics["alpha_resolved_total"] = sum(alpha["n"] for alpha in alpha_stats) if alpha_stats else 0
