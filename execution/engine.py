@@ -40,6 +40,11 @@ class ExecutionEngine:
 
         if mode == "SHADOW":
             signal.mode = "SHADOW"
+            logger.info(
+                f"SHADOW gate check | strategy: {signal.strategy} | "
+                f"edge: {round(signal.edge, 3)} | "
+                f"confidence: {round(signal.confidence, 3) if getattr(signal, 'confidence', None) is not None else 'N/A'}"
+            )
             struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
             self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
             # Note: We might still want to record the bet to track its CLV later,

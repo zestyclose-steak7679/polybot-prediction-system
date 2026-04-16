@@ -193,6 +193,7 @@ def send_summary(
     blocked_by_threshold = cycle_metrics.get("blocked_by_threshold", 0)
     blocked_by_risk = cycle_metrics.get("blocked_by_risk", 0)
     executed_trades = cycle_metrics.get("executed_trades", 0)
+    avg_confidence = cycle_metrics.get("avg_confidence")
     signal_breakdown = f"{raw_signals} raw | {blocked_by_threshold} no edge | {blocked_by_risk} risk blocked | {executed_trades} executed"
 
     text = (
@@ -212,7 +213,7 @@ def send_summary(
         f"── ALPHA SHADOW ──\n"
         f"{alpha_lines}\n"
         f"── MODEL ──\n"
-        f"{model_mode}  |  Regime: {regime}\n"
+        f"{model_mode}  |  Regime: {regime}  |  META: {round(avg_confidence, 2) if avg_confidence is not None else '-'}\n"
         f"{'─' * 28}"
     )
 
