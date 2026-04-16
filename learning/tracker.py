@@ -123,6 +123,10 @@ def get_active_strategies() -> list[str]:
             active.append(strategy)
             continue
 
+        if stats["n_bets"] < MIN_BETS_TO_EVAL:
+            active.append(strategy)
+            continue
+
         if eval_stats["roi"] >= STRATEGY_MIN_ROI:
             active.append(strategy)
             logger.info(
