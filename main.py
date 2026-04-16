@@ -620,6 +620,11 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         send_weekly_report(weekly_stats)
         weekly_file.write_text(str(now_ts))
 
+    import sqlite3
+    with sqlite3.connect("polybot.db") as conn:
+        count = conn.execute("SELECT COUNT(*) FROM paper_bets").fetchone()[0]
+        logger.info(f"DB CHECK | paper_bets table rows: {count}")
+
     logger.info(f"END | ${bankroll:.2f} | alerts={new_alerts} | regime={dom_regime} | {mmode}")
     return bankroll
 

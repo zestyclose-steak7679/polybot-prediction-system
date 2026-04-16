@@ -66,6 +66,10 @@ class ExecutionEngine:
                     confidence=signal.confidence,
                     reason=signal.reason,
                 )
+                if not bet_id:
+                    logger.error(f"PAPER BET FAILED | {market_id} | bet_id={bet_id}")
+                    continue
+
                 if bet_id:
                     struct_logger.info("EXECUTED", market_id, "success", {
                         "bet_id": bet_id,
