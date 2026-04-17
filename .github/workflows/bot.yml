@@ -53,6 +53,8 @@ jobs:
       - name: Persist state
         if: always()
         run: |
+          git rebase --abort 2>/dev/null || true
+          rm -fr .git/rebase-merge 2>/dev/null || true
           git config user.name "polybot"
           git config user.email "polybot@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
@@ -60,13 +62,15 @@ jobs:
           git checkout main
           git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json daily_benchmarks.json last_weekly.txt || true
           git diff --staged --quiet || git commit -m "chore: state [skip ci]"
-          git push origin main
+          git push origin main --force-with-lease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Save state cache
         if: always()
         run: |
+          git rebase --abort 2>/dev/null || true
+          rm -fr .git/rebase-merge 2>/dev/null || true
           git config user.name "polybot"
           git config user.email "polybot@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
@@ -74,6 +78,6 @@ jobs:
           git checkout main
           git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json daily_benchmarks.json last_weekly.txt || true
           git diff --staged --quiet || git commit -m "chore: state [skip ci]"
-          git push origin main
+          git push origin main --force-with-lease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
