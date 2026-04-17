@@ -139,7 +139,6 @@ def get_active_strategies() -> list[str]:
                     f"Strategy '{strategy}': only {stats['n_bets']} bets "
                     f"— skipping kill eval (minimum 10 required)"
                 )
-                active.append(strategy)
                 continue
             disabled.append(strategy)
             logger.warning(

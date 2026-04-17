@@ -80,8 +80,7 @@ def init_db():
             price_5m REAL, price_15m REAL, price_60m REAL,
 
 
-            clv_5m REAL, clv_15m REAL, clv_60m REAL,
-            mode TEXT DEFAULT 'ACTIVE'
+            clv_5m REAL, clv_15m REAL, clv_60m REAL
         );
         CREATE TABLE IF NOT EXISTS market_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -185,7 +184,7 @@ def init_db():
                     pass
             try:
                 con.execute("ALTER TABLE paper_bets ADD COLUMN mode TEXT DEFAULT 'ACTIVE'")
-            except sqlite3.OperationalError:
+            except Exception:
                 pass
             con.commit()
     except sqlite3.OperationalError as exc:
@@ -240,16 +239,16 @@ def record_alert(market_id, question, side, strategy, score):
         con.commit()
 
 def record_paper_bet(market_id, question, strategy_tag, side, entry_price,
-                     bet_size, bankroll, kelly_raw, edge_est, confidence, reason, mode="ACTIVE"):
+                     bet_size, bankroll, kelly_raw, edge_est, confidence, reason):
     with _conn() as con:
         cur = con.execute(
             """INSERT INTO paper_bets
                (market_id,question,strategy_tag,side,entry_price,bet_size,
-                bankroll_at,kelly_raw,edge_est,confidence,reason,placed_at,mode)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                bankroll_at,kelly_raw,edge_est,confidence,reason,placed_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (market_id, question, strategy_tag, side, entry_price, bet_size,
              bankroll, kelly_raw, edge_est, confidence, reason,
-             _utc_now().isoformat(), mode))
+             _utc_now().isoformat()))
         con.commit()
         return cur.lastrowid
 

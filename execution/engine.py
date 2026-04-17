@@ -57,44 +57,12 @@ class ExecutionEngine:
                 f"edge: {round(signal.edge, 3)} | "
                 f"confidence: {round(signal.confidence, 3) if getattr(signal, 'confidence', None) is not None else 'N/A'}"
             )
-
-            from scoring.engine import confidence_multiplier
-            multiplier = confidence_multiplier(signal.confidence)
-            adjusted_bet = round(bet_size * multiplier, 2)
-            adjusted_bet = min(adjusted_bet, self.bankroll * 0.05)
-            adjusted_bet = max(adjusted_bet, self.bankroll * 0.005)
-            logger.info(
-                f"Bet sizing | base: {bet_size} | "
-                f"confidence: {signal.confidence} | "
-                f"multiplier: {multiplier} | "
-                f"adjusted: {adjusted_bet}"
-            )
-            bet_size = adjusted_bet
-
             struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
-
-            details = "Executed in SHADOW mode"
-            if multiplier != 1.0:
-                self._notify_outcome(signal, "shadow", details, multiplier=multiplier)
-            else:
-                self._notify_outcome(signal, "shadow", details)
-
-            record_paper_bet(
-                market_id=market_id,
-                question=signal.question,
-                strategy_tag=signal.strategy,
-                side=signal.side,
-                entry_price=signal.price,
-                bet_size=adjusted_bet,
-                bankroll=self.bankroll,
-                kelly_raw=kelly_raw,
-                edge_est=signal.edge,
-                confidence=signal.confidence,
-                reason=signal.reason,
-                mode="SHADOW"
-            )
-            logger.info(f"SHADOW bet recorded | market: {market_id} | size: {adjusted_bet}")
-
+            self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
+            # Note: We might still want to record the bet to track its CLV later,
+            # but let's record it with bet_size 0 or a special tag if needed.
+            # For now, we will execute it but log it as shadow, or maybe not place it.
+            # The prompt says: "signals generated but NOT executed, only logged".
             return None, "shadow"
 
         # ACTIVE MODE
@@ -139,14 +107,12 @@ class ExecutionEngine:
         self._notify_outcome(signal, "failed", "Execution failed after retries")
         return None, "failed"
 
-    def _notify_outcome(self, signal: Signal, status: str, details: str, multiplier: float = 1.0):
+    def _notify_outcome(self, signal: Signal, status: str, details: str):
         text = (
             f"🚀 <b>Execution Update</b>\n"
             f"Market: {signal.market_id}\n"
             f"Strategy: {signal.strategy}\n"
             f"Status: {status.upper()}\n"
+            f"Details: {details}"
         )
-        if multiplier != 1.0:
-            text += f"Sizing: {multiplier}x (confidence: {signal.confidence})\n"
-        text += f"Details: {details}"
         _send(text)
