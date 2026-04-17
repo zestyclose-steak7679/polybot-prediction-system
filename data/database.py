@@ -182,6 +182,10 @@ def init_db():
                     con.execute(f"ALTER TABLE paper_bets ADD COLUMN {col} REAL")
                 except sqlite3.OperationalError:
                     pass
+            try:
+                con.execute("ALTER TABLE paper_bets ADD COLUMN mode TEXT DEFAULT 'ACTIVE'")
+            except Exception:
+                pass
             con.commit()
     except sqlite3.OperationalError as exc:
         if "disk I/O error" not in str(exc):
