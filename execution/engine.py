@@ -86,6 +86,11 @@ class ExecutionEngine:
                 logger.error(
                     f"SHADOW record FAILED | market: {market_id} | error: {e}"
                 )
+                self._notify_outcome(
+                    signal,
+                    "error",
+                    f"SHADOW DB FAILED: {str(e)[:100]}"
+                )
             return None, "shadow"
 
         # ACTIVE MODE
