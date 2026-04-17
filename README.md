@@ -1,267 +1,251 @@
-# Polybot — Autonomous Polymarket Prediction System
+# 🤖 Polybot — Autonomous Prediction Market Trading System
 
-A fully autonomous paper-trading and signal bot for [Polymarket](https://polymarket.com). Fetches live markets, scores them with heuristic + ML models, manages a portfolio with Kelly sizing and risk controls, and sends Telegram alerts — all with zero manual intervention.
+> A self-improving, signal-driven trading bot for [Polymarket](https://polymarket.com) — built for learning, designed for real edge.
+
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
+[![GitHub Actions](https://img.shields.io/badge/hosting-GitHub%20Actions-2088FF)](https://github.com/features/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Status: Paper Trading](https://img.shields.io/badge/status-paper%20trading-yellow.svg)](#)
 
 ---
 
-## Architecture
+## What Is This?
+
+Polybot is an automated prediction market trading system that fetches real Polymarket markets, scores them using engineered signals, manages risk with Kelly sizing, and either paper-trades or executes live. It runs 24/7 for free via GitHub Actions.
+
+**The honest framing:** this is a learning project built with serious architectural depth. Whether it generates real profit depends entirely on whether the underlying signals have positive Closing Line Value (CLV) over time — not on the sophistication of the system around them. Architecture doesn't create alpha. Data does.
+
+---
+
+## System Architecture
+
+```
+[DATA ENGINE]
+      ↓
+[PROBABILITY ENGINE]  ← 17 engineered features, GBM meta-model
+      ↓
+[ALPHA ENGINE]        ← signal scoring, edge decay, shadow strategies
+      ↓
+[REGIME DETECTOR]     ← MiniBatchKMeans market clustering
+      ↓
+[RISK MANAGER]        ← Kelly sizing, drawdown control, correlation matrix
+      ↓
+[EXECUTION ENGINE]    ← paper trades or live CLOB orders
+      ↓
+[EVALUATION ENGINE]   ← CLV tracking, Sharpe, Brier score
+      ↓
+  (feedback loop into models)
+```
+
+### Layer 1 — Data Engine
+- Polymarket Gamma API (no auth required) for market fetching
+- Price history tracking across 30-minute cycles
+- Stale market detection, volume validation, price history integrity checks
+- SQLite persistence (`polybot.db`)
+
+### Layer 2 — Probability Engine
+- 17 engineered features: momentum ratios, z-scores, volume spike ratios, time-to-resolution, liquidity flags
+- `GradientBoostingClassifier` / `GradientBoostingRegressor` trained on CLV targets (not PnL)
+- Walk-forward training to prevent lookahead bias
+
+### Layer 3 — Alpha Engine
+- Three competing active strategies with Sharpe-weighted meta-model allocation
+- Two shadow alpha strategies (`late_drift`, `reversion_gap`) — promoted to active when statistically validated
+- Edge decay: signal scores decay as market approaches resolution
+- Signal scoring pipeline with cross-market comparison
+
+### Layer 4 — Regime Detector
+- `MiniBatchKMeans` clustering for unsupervised market regime identification
+- Regime state persisted to `regime_state.json`
+- Bet sizing and strategy weights adjusted per regime
+
+### Layer 5 — Risk Manager
+- Quarter-Kelly sizing with configurable Kelly fraction
+- Empirical correlation matrix derived from historical strategy PnL pivots
+- Drawdown controller: reduces position sizes automatically under drawdown
+- Feature drift monitor: flags when live feature distribution diverges from training
+- Position timeout mechanism for stale open bets
+- `MAX_OPEN_BETS = 8` cap with bankroll exposure tracking
+
+### Layer 6 — Evaluation Engine
+- **CLV (Closing Line Value)** is the north star metric — captured within 48-hour resolution window
+- Brier score, hit rate, Sharpe ratio tracked per strategy
+- Strategy killer: disables underperforming strategies after 50-bet minimum threshold + 12-hour cooldown
+- Full settlement statistics with per-strategy breakdowns
+
+---
+
+## Repository Structure
 
 ```
 polybot/
-├── main.py                        ← entry point (single run / loop / backtest)
-├── config.py                      ← all settings and thresholds
-├── telegram_terminal.py           ← interactive Telegram terminal interface
+├── main.py                    ← entry point (single run, loop, backtest)
+├── config.py                  ← all tunable parameters
 ├── requirements.txt
 │
 ├── data/
-│   ├── markets.py                 ← Gamma API fetch (no auth required)
-│   ├── database.py                ← SQLite schema, paper bet logging, CLV tracking
-│   ├── features.py                ← feature engineering (momentum, volume, ELO, H2H)
-│   ├── price_history.py           ← per-market price history store
-│   └── regime_features.py        ← volatility / trend / autocorrelation features
+│   ├── markets.py             ← Gamma API fetch
+│   └── database.py            ← SQLite schema + queries
 │
 ├── scoring/
-│   ├── filters.py                 ← hard filters (liquidity, price range, volume)
-│   ├── strategies.py              ← momentum / reversal / volume_spike signals
-│   └── engine.py                  ← scoring pipeline + Kelly sizing
-│
-├── models/
-│   ├── edge_model.py              ← heuristic (Mode A) → GBM (Mode B at 50+ bets)
-│   ├── clv_model.py               ← closing line value predictor
-│   ├── meta_model.py              ← strategy weight allocator
-│   └── regime_model.py            ← unsupervised regime detector (KMeans)
+│   ├── filters.py             ← hard filters (liquidity, price range)
+│   ├── engine.py              ← 17-feature engineering + meta-model
+│   └── features.py            ← feature extraction pipeline
 │
 ├── alpha/
-│   ├── signals.py                 ← shadow alpha signals (late_volume, reversion, spread)
-│   ├── evaluator.py               ← alpha module performance tracker
-│   └── tracker.py                 ← alpha outcome resolver
-│
-├── learning/
-│   ├── tracker.py                 ← per-strategy stats and activation logic
-│   ├── online_trainer.py          ← scheduled model retraining
-│   ├── drift_monitor.py           ← feature drift detection → size multiplier
-│   ├── alpha_diagnostics.py       ← alpha signal diagnostics per cycle
-│   └── regime_stability.py        ← 3-cycle regime confirmation filter
-│
-├── risk/
-│   ├── controls.py                ← max drawdown, open bet cap, daily loss limits
-│   ├── drawdown_controller.py     ← bet size multiplier based on drawdown
-│   └── strategy_killer.py         ← auto-disables underperforming strategies
-│
-├── portfolio/
-│   ├── allocator.py               ← Kelly-based capital allocation
-│   ├── risk_manager.py            ← per-signal risk constraints
-│   └── strategy_weights.py        ← Sharpe-weighted strategy blending
-│
-├── tracking/
-│   └── clv.py                     ← closing line value settlement + reporting
-│
-├── alerts/
-│   └── telegram.py                ← pick alerts, summaries, errors, risk halts
-│
-├── execution/
-│   └── paper.py                   ← paper trade recorder
+│   ├── strategies.py          ← active + shadow strategy implementations
+│   ├── meta_model.py          ← Sharpe-weighted strategy allocator
+│   └── regime.py              ← MiniBatchKMeans regime detector
 │
 ├── backtest/
-│   └── engine.py                  ← walk-forward backtester
+│   └── walk_forward.py        ← walk-forward replay engine
 │
-├── dashboard/
-│   └── server.py                  ← local web dashboard (localhost:8080)
+├── alerts/
+│   └── telegram.py            ← Telegram Bot API alerts
 │
-├── strategies/
-│   └── router.py                  ← regime-aware strategy selector
+├── tests/
+│   └── ...                    ← unit + integration tests
 │
-└── tests/
-    ├── test_alpha.py
-    ├── test_feedback_loop.py
-    └── test_position_timeout.py
+└── .github/workflows/
+    └── bot.yml                ← GitHub Actions (free 24/7 hosting)
 ```
 
 ---
 
-## How It Works
+## Quickstart
 
-Each cycle (every 30 min) runs this pipeline:
+### 1. Install
 
-1. **Settle** — close resolved/stale positions, compute CLV on settled bets
-2. **Risk checks** — halt if drawdown > 20% or open bets at cap
-3. **Retrain** — auto-retrain edge/CLV/meta models if due
-4. **Drift check** — detect feature distribution shift, reduce bet sizes if needed
-5. **Fetch markets** — pull live Polymarket markets via Gamma API
-6. **Filter** — apply hard filters (liquidity, volume, price range)
-7. **Feature engineering** — build per-market features + regime vectors
-8. **Alpha signals** — run shadow alpha modules (late volume, reversion, spread compression)
-9. **Strategy selection** — regime-aware routing selects active strategies
-10. **Signal generation** — momentum / reversal / volume_spike strategies score markets
-11. **Model enhancement** — edge model + CLV model + meta-model refine signals
-12. **Portfolio allocation** — Kelly sizing with Sharpe-weighted strategy blending
-13. **Risk constraints** — per-signal position limits applied
-14. **Alert + log** — send Telegram alerts, record paper bets to SQLite
-
----
-
-## Models
-
-| Model | Activates | Purpose |
-|---|---|---|
-| `edge_model` | Always (heuristic) → ML at 50+ bets | Estimates true probability of YES |
-| `clv_model` | At 30+ closed bets | Predicts expected closing line value |
-| `meta_model` | At 100+ CLV-resolved bets | Weights strategies by predicted performance |
-| `regime_model` | Always (KMeans, online) | Classifies market into neutral/trending/volatile/mean-reverting |
-
----
-
-## Setup
-
-### Step 1 — Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 2 — Telegram bot
+### 2. Configure Telegram (for alerts)
+
 1. Message `@BotFather` on Telegram → `/newbot` → copy token
 2. Message `@userinfobot` → copy your chat ID
 
-### Step 3 — Environment variables
+### 3. Set environment variables
 
-**Mac/Linux:**
 ```bash
+# Mac/Linux
 export TELEGRAM_TOKEN=your_token_here
 export TELEGRAM_CHAT_ID=your_chat_id_here
 export BANKROLL=1000
-```
 
-**Windows:**
-```cmd
+# Windows
 set TELEGRAM_TOKEN=your_token_here
 set TELEGRAM_CHAT_ID=your_chat_id_here
 set BANKROLL=1000
 ```
 
-### Step 4 — Run
+### 4. Run
 
 ```bash
-# Single cycle (test)
+# Single run (test)
 python main.py
 
-# Autonomous loop (every 30 min)
+# Loop mode — runs every 30 minutes
 python main.py --loop
 
-# Walk-forward backtest
+# Walk-forward backtest on historical data
 python main.py --backtest
 
-# Local dashboard
-python dashboard/server.py   # → http://localhost:8080
-
-# Interactive Telegram terminal
-python telegram_terminal.py
+# Flask dashboard (port 8080)
+python dashboard/server.py
 ```
 
 ---
 
-## Free 24/7 via GitHub Actions
+## Free 24/7 Hosting via GitHub Actions
 
-1. Push this repo to GitHub
+1. Push to a GitHub repo
 2. Go to **Settings → Secrets → Actions** and add:
    - `TELEGRAM_TOKEN`
    - `TELEGRAM_CHAT_ID`
    - `BANKROLL`
-3. Bot runs every 30 min automatically on GitHub's free tier
+3. Done — bot runs every 30 minutes, completely free
 
-GitHub free tier = 2,000 min/month. Bot uses ~1,440 min/month.
-
----
-
-## Configuration (`config.py`)
-
-### Edge & Sizing
-| Variable | Default | Meaning |
-|---|---|---|
-| `EDGE_THRESHOLD` | `0.04` | Minimum 4% estimated edge to generate a signal |
-| `KELLY_FRACTION` | `0.25` | Quarter-Kelly staking (conservative) |
-| `MAX_BET_PCT` | `0.03` | Never bet more than 3% of bankroll per signal |
-
-### Risk Controls
-| Variable | Default | Meaning |
-|---|---|---|
-| `MAX_DRAWDOWN_PCT` | `0.20` | Halt all betting if bankroll drops 20% from peak |
-| `MAX_OPEN_BETS` | `8` | Maximum simultaneous paper bets |
-| `MAX_POSITION_AGE_HOURS` | `6` | Recycle capital from stale open positions |
-| `STRATEGY_MIN_ROI` | `-0.05` | Auto-disable strategy if ROI drops below -5% |
-| `MIN_BETS_TO_EVAL` | `10` | Don't evaluate a strategy until it has 10 bets |
-
-### Market Filters
-| Variable | Default | Meaning |
-|---|---|---|
-| `MIN_LIQUIDITY` | `500` | Minimum $500 liquidity |
-| `MIN_VOLUME` | `1000` | Minimum $1,000 total volume |
-| `MIN_PRICE` | `0.05` | Ignore markets priced below 5¢ or above 95¢ |
-| `MAX_PRICE` | `0.95` | (see above) |
-| `ALERT_COOLDOWN_HOURS` | `6` | Don't re-alert the same market within 6 hours |
-
-### Strategies
-| Variable | Default | Meaning |
-|---|---|---|
-| `MOMENTUM_THRESHOLD` | `0.05` | 5% price move required to trigger momentum signal |
-| `REVERSAL_THRESHOLD` | `0.12` | 12% move required to trigger reversal signal |
-| `VOLUME_SPIKE_RATIO` | `2.0` | Volume must be 2× expected to trigger volume_spike |
-
-### Target Markets
-```python
-TARGET_TAGS = [
-    "sports", "cricket", "football", "soccer", "nba", "nfl",
-    "tennis", "ipl", "world-cup",
-    "politics", "elections", "us-politics", "india", "geopolitics",
-    "crypto", "bitcoin", "ethereum", "defi",
-]
-```
+> GitHub free tier = 2000 min/month. Bot uses ~1440 min/month. Zero cost.
 
 ---
 
-## Closing Line Value (CLV)
+## Configuration Reference
 
-The bot tracks **CLV** (Closing Line Value) as its primary performance metric — whether signals beat the final market price before resolution. A positive mean CLV over 30+ bets indicates genuine edge. Negative CLV means the market was already pricing in the information.
-
-CLV is used to:
-- Evaluate alpha signal quality
-- Gate strategy weight activation
-- Trigger strategy auto-kill if consistently negative
-
----
-
-## Tests
-
-```bash
-python -m pytest tests/
-```
-
-Covers: alpha signal pipeline, feedback loop, position timeout, bankroll loading.
+| Variable | Default | Description |
+|---|---|---|
+| `EDGE_THRESHOLD` | `0.04` | Min 4% edge to place a bet |
+| `KELLY_FRACTION` | `0.25` | Quarter-Kelly (conservative sizing) |
+| `MAX_BET_PCT` | `0.05` | Never bet >5% bankroll per position |
+| `MIN_LIQUIDITY` | `500` | Min $500 market liquidity |
+| `ALERT_COOLDOWN_HOURS` | `6` | Re-alert cooldown per market |
+| `MAX_OPEN_BETS` | `8` | Max simultaneous open positions |
+| `STRATEGY_MIN_BETS` | `50` | Min bets before strategy can be killed |
+| `CLV_WINDOW_HOURS` | `48` | Hours before resolution to capture CLV |
+| `DRAWDOWN_HALT_PCT` | `0.15` | Reduce sizing at 15% drawdown |
 
 ---
 
-## What It Does / Doesn't Do
+## Metrics & Evaluation
 
-✅ Fetches real Polymarket markets (no auth needed)  
-✅ Multi-strategy signal generation (momentum, reversal, volume spike)  
-✅ Heuristic → ML edge model (auto-upgrades at 50+ closed bets)  
-✅ Regime detection (neutral / trending / volatile / mean-reverting)  
-✅ Kelly sizing with Sharpe-weighted strategy blending  
-✅ Full risk controls (drawdown halt, open bet cap, strategy killer)  
-✅ CLV tracking as primary edge metric  
-✅ Shadow alpha modules (run in observation before going live)  
-✅ Walk-forward backtesting  
-✅ Telegram alerts + interactive terminal  
-✅ Local web dashboard  
-✅ Free 24/7 via GitHub Actions  
+The primary evaluation signal is **CLV (Closing Line Value)** — not P&L.
 
-❌ Does NOT place real bets (paper trading only)  
-❌ Does NOT connect to Polymarket CLOB API  
-❌ Does NOT guarantee edge — CLV must be validated over 30+ bets before trusting signals  
+> CLV measures whether you bought at better odds than the market's final implied probability before resolution. Positive average CLV over 50+ bets is the only reliable signal that your edge is real and not noise.
+
+Secondary metrics tracked per strategy:
+- **Sharpe Ratio** — risk-adjusted returns
+- **Brier Score** — probability calibration quality
+- **Hit Rate** — raw win rate (least informative in isolation)
+- **Kelly-weighted P&L** — actual paper/live profit
+
+---
+
+## Current Status
+
+| Component | Status |
+|---|---|
+| Data pipeline | ✅ Live |
+| 17-feature engineering | ✅ Live |
+| Meta-model (GBM) | ✅ Live |
+| Regime detection | ✅ Live |
+| Kelly sizing + drawdown control | ✅ Live |
+| CLV tracking | ✅ Live |
+| Strategy killer | ✅ Live |
+| Paper trading | ✅ Live |
+| Live execution (CLOB) | 🔧 Phase 3 |
+| External signals (news/Twitter) | 🔧 Future |
+
+---
+
+## Honest Caveats
+
+- **Heuristic edge estimates are not calibrated probabilities.** The system's signals are engineered features, not outputs from a proper Bayesian model. Treat them accordingly.
+- **50+ closed bets per strategy is the minimum** to draw any conclusions about CLV. Don't kill strategies early — that's the strategy killer's job, with its built-in cooldown.
+- **58% bankroll deployment is normal**, not alarming. With `MAX_OPEN_BETS = 8` and 30-min cycles, this is expected capital accumulation across multiple positions.
+- **Correlation matrix is empirical.** It's derived from historical strategy PnL and updated over time. Early estimates with few data points should be treated as rough guides only.
 
 ---
 
 ## Roadmap
 
-- **Current:** Full autonomous paper trading with ML edge model, CLV tracking, regime detection
-- **Next:** Player availability / news event features to capture information not priced into sharp odds
-- **Future:** Live execution via Polymarket CLOB API once positive CLV is confirmed over sufficient sample
+**Phase 1 (complete):** Real data + heuristic scoring + Telegram alerts + paper trades
+
+**Phase 2 (current):** ML models, CLV training targets, regime detection, alpha engine, risk management
+
+**Phase 3 (next):** Live execution via Polymarket CLOB API with full Polygon wallet integration
+
+**Phase 4 (future):** External signal ingestion (news, Twitter), cross-market arbitrage detection, ensemble probability calibration
+
+---
+
+## Development Notes
+
+This project tracks CLV as its core training signal and uses walk-forward validation to prevent data leakage. The goal is not to over-engineer the system, but to accumulate enough real market observations to determine whether any of the current signals carry genuine predictive power.
+
+If they don't, the system will tell you — that's what the strategy killer and CLV tracking are for.
+
+---
+
+## License
+
+MIT — use freely, fork freely, trade responsibly.
