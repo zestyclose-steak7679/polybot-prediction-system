@@ -63,19 +63,28 @@ class ExecutionEngine:
             # but let's record it with bet_size 0 or a special tag if needed.
             # For now, we will execute it but log it as shadow, or maybe not place it.
             # The prompt says: "signals generated but NOT executed, only logged".
+
             try:
                 from scoring.engine import confidence_multiplier
                 multiplier = confidence_multiplier(signal.confidence)
                 adjusted_bet = round(bet_size * multiplier, 2)
                 adjusted_bet = min(adjusted_bet, self.bankroll * 0.05)
                 adjusted_bet = max(adjusted_bet, self.bankroll * 0.005)
+
+
+            try:
+
                 record_paper_bet(
                     market_id=market_id,
                     question=signal.question,
                     strategy_tag=signal.strategy,
                     side=signal.side,
                     entry_price=signal.price,
+
                     bet_size=adjusted_bet,
+
+                    bet_size=bet_size,
+
                     bankroll=self.bankroll,
                     kelly_raw=kelly_raw,
                     edge_est=signal.edge,
@@ -85,12 +94,19 @@ class ExecutionEngine:
                 )
                 logger.info(
                     f"SHADOW bet recorded | market: {market_id} | "
+
                     f"size: {adjusted_bet} | confidence: {signal.confidence}"
                 )
             except Exception as e:
                 logger.error(
                     f"SHADOW record FAILED | market: {market_id} | error: {e}"
                 )
+
+                    f"size: {bet_size} | confidence: {signal.confidence}"
+                )
+            except Exception as e:
+                logger.error(f"SHADOW record failed | market: {market_id} | error: {e}")
+
 
             return None, "shadow"
 
