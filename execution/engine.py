@@ -79,10 +79,22 @@ class ExecutionEngine:
             else:
                 self._notify_outcome(signal, "shadow", details)
 
-            # Note: We might still want to record the bet to track its CLV later,
-            # but let's record it with bet_size 0 or a special tag if needed.
-            # For now, we will execute it but log it as shadow, or maybe not place it.
-            # The prompt says: "signals generated but NOT executed, only logged".
+            record_paper_bet(
+                market_id=market_id,
+                question=signal.question,
+                strategy_tag=signal.strategy,
+                side=signal.side,
+                entry_price=signal.price,
+                bet_size=adjusted_bet,
+                bankroll=self.bankroll,
+                kelly_raw=kelly_raw,
+                edge_est=signal.edge,
+                confidence=signal.confidence,
+                reason=signal.reason,
+                mode="SHADOW"
+            )
+            logger.info(f"SHADOW bet recorded | market: {market_id} | size: {adjusted_bet}")
+
             return None, "shadow"
 
         # ACTIVE MODE

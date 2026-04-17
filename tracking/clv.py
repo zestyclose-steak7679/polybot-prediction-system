@@ -234,9 +234,13 @@ def settle_and_compute_clv(bankroll: float) -> tuple[float, dict]:
                 no_current = 1.0 - current_price
                 pnl = bet_size * (no_current / no_entry - 1.0)
 
-        returned = bet_size + pnl
-        bankroll += returned
-        stats["returned_capital"] += returned
+        # SHADOW trades don't return real capital
+        is_shadow = bet.get("mode") == "SHADOW"
+        if not is_shadow:
+            returned = bet_size + pnl
+            bankroll += returned
+            stats["returned_capital"] += returned
+
         clv_values.append(clv)
 
         result = "win" if won else ("timeout_loss" if is_stale and pnl < 0 else "timeout_win" if is_stale else "loss")
