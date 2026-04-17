@@ -59,7 +59,8 @@ jobs:
           git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json || true
           git add daily_benchmarks.json last_weekly.txt || true
           git diff --staged --quiet || git commit -m "chore: state [skip ci]"
-          git push
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git push origin HEAD
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -71,6 +72,7 @@ jobs:
           git config user.email "bot@polybot"
           git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json daily_benchmarks.json
           git diff --staged --quiet || git commit -m "chore: state [skip ci]"
-          git push
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git push origin HEAD
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
