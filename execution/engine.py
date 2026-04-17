@@ -54,15 +54,10 @@ class ExecutionEngine:
             signal.mode = "SHADOW"
             logger.info(
                 f"SHADOW gate check | strategy: {signal.strategy} | "
-                f"edge: {round(signal.edge, 3)} | "
-                f"confidence: {round(signal.confidence, 3) if getattr(signal, 'confidence', None) is not None else 'N/A'}"
+                f"edge: {signal.edge} | confidence: {signal.confidence}"
             )
             struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
             self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
-            # Note: We might still want to record the bet to track its CLV later,
-            # but let's record it with bet_size 0 or a special tag if needed.
-            # For now, we will execute it but log it as shadow, or maybe not place it.
-            # The prompt says: "signals generated but NOT executed, only logged".
 
             try:
                 from scoring.engine import confidence_multiplier
@@ -70,21 +65,13 @@ class ExecutionEngine:
                 adjusted_bet = round(bet_size * multiplier, 2)
                 adjusted_bet = min(adjusted_bet, self.bankroll * 0.05)
                 adjusted_bet = max(adjusted_bet, self.bankroll * 0.005)
-
-
-            try:
-
                 record_paper_bet(
                     market_id=market_id,
                     question=signal.question,
                     strategy_tag=signal.strategy,
                     side=signal.side,
                     entry_price=signal.price,
-
                     bet_size=adjusted_bet,
-
-                    bet_size=bet_size,
-
                     bankroll=self.bankroll,
                     kelly_raw=kelly_raw,
                     edge_est=signal.edge,
@@ -94,19 +81,12 @@ class ExecutionEngine:
                 )
                 logger.info(
                     f"SHADOW bet recorded | market: {market_id} | "
-
                     f"size: {adjusted_bet} | confidence: {signal.confidence}"
                 )
             except Exception as e:
                 logger.error(
                     f"SHADOW record FAILED | market: {market_id} | error: {e}"
                 )
-
-                    f"size: {bet_size} | confidence: {signal.confidence}"
-                )
-            except Exception as e:
-                logger.error(f"SHADOW record failed | market: {market_id} | error: {e}")
-
 
             return None, "shadow"
 
