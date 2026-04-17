@@ -47,7 +47,8 @@ def resolve_alpha_signals(current_markets: pd.DataFrame) -> int:
             continue
 
         closing_price = float(row["yes_price"] if signal["direction"] == "YES" else row["no_price"])
-        clv_value = compute_clv(float(signal["entry_price"]), closing_price)
+        direction_val = 1 if signal["direction"] == "YES" else -1
+        clv_value = compute_clv(float(signal["entry_price"]), closing_price, direction=direction_val)
         if clv_value is None:
             continue
 
