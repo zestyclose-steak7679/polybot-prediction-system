@@ -58,6 +58,7 @@ class ExecutionEngine:
             )
             struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
             self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
+
             try:
                 from scoring.engine import confidence_multiplier
                 multiplier = confidence_multiplier(signal.confidence)
@@ -86,6 +87,7 @@ class ExecutionEngine:
                 logger.error(
                     f"SHADOW record FAILED | market: {market_id} | error: {e}"
                 )
+
             return None, "shadow"
 
         # ACTIVE MODE
