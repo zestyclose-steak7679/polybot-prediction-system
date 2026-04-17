@@ -170,6 +170,15 @@ def init_db():
     try:
         with _conn() as con:
             con.executescript(schema)
+
+            try:
+                con.execute(
+                    "ALTER TABLE paper_bets ADD COLUMN mode TEXT DEFAULT 'ACTIVE'"
+                )
+                con.commit()
+            except Exception:
+                pass
+
             # Check and add columns for db upgrades
             try:
                 con.execute("ALTER TABLE alpha_signals ADD COLUMN closing_price REAL")
