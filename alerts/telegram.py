@@ -160,6 +160,12 @@ def send_summary(
     # Open Positions
     open_bets = position_stats.get("n_open", 0)
     avg_hold = position_stats.get("avg_hold_hours", 0.0)
+    try:
+        from data.database import get_open_bets
+        open_bets_db = len(get_open_bets())
+        db_line = f"DB: {open_bets_db} open in paper_bets\n\n"
+    except Exception:
+        db_line = "DB: unknown\n\n"
     closed_this_cycle = cycle_metrics.get("closed_this_cycle", 0)
     timeout_closed = cycle_metrics.get("timeout_closed_this_cycle", 0)
 
@@ -216,7 +222,8 @@ def send_summary(
         f"Avg CLV: {avg_clv_val:.3f}  |  Sharpe: {sharpe_val:.3f}\n\n"
         f"── POSITIONS ──\n"
         f"Open: {open_bets}  |  Avg hold: {avg_hold:.1f}h\n"
-        f"Closed this cycle: {closed_this_cycle}  |  Timeouts: {timeout_closed}\n\n"
+        f"Closed this cycle: {closed_this_cycle}  |  Timeouts: {timeout_closed}\n"
+        f"{db_line}"
         f"── STRATEGIES ──\n"
         f"{strat_line}\n\n"
         f"── ALPHA SHADOW ──\n"
