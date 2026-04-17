@@ -128,6 +128,8 @@ def send_summary(
     position_stats: dict | None = None,
     cycle_metrics: dict | None = None,
     clv_stats: dict | None = None,
+    benchmark_data: dict | None = None,
+    tracker_active: list | None = None,
 ):
     token, chat_id = _get_credentials()
     if not token or not chat_id:
@@ -140,7 +142,11 @@ def send_summary(
     clv_stats = clv_stats or {}
 
     # Performance
-    total_bets = stats.get('total_bets', 0)
+    total_bets = (
+        benchmark_data.get('bets_today', 0)
+        if benchmark_data
+        else stats.get('total_bets', 0)
+    )
     wins = stats.get('wins', 0)
     losses = stats.get('losses', 0)
     win_rate = stats.get('win_rate', 0.0)
@@ -164,10 +170,13 @@ def send_summary(
 
     strat_items = []
     for s in strategy_stats:
-        if s["strategy"] in active_strategies:
-            strat_items.append(f"✅ {s['strategy']}")
+        name = s["strategy"]
+        if name in active_strategies:
+            strat_items.append(f"✅ {name}")
+        elif tracker_active is not None and name in tracker_active:
+            strat_items.append(f"⏸ {name} (regime filtered)")
         else:
-            reason = killed_log.get(s["strategy"], {}).get("reason") if isinstance(killed_log.get(s["strategy"]), dict) else None
+            reason = killed_log.get(name, {}).get("reason") if isinstance(killed_log.get(name), dict) else None
             # If strategy is disabled by tracker.py instead of killer, it won't have a reason in killed_log
             if not reason:
                 roi_val = s.get("roi")
@@ -175,7 +184,7 @@ def send_summary(
                     reason = f"ROI {roi_val*100:.1f}% < {STRATEGY_MIN_ROI*100:.0f}%"
                 else:
                     reason = "disabled"
-            strat_items.append(f"❌ {s['strategy']} ({reason})")
+            strat_items.append(f"❌ {name} ({reason})")
 
     strat_line = "    | ".join(strat_items)
 
