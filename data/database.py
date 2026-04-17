@@ -74,6 +74,7 @@ def init_db():
             side TEXT, entry_price REAL, bet_size REAL,
             bankroll_at REAL, kelly_raw REAL, edge_est REAL,
             confidence REAL, reason TEXT, placed_at TEXT,
+            mode TEXT DEFAULT 'ACTIVE',
             result TEXT DEFAULT 'open',
             exit_price REAL, closing_price REAL,
             pnl REAL, roi REAL, clv REAL, closed_at TEXT,
@@ -239,16 +240,17 @@ def record_alert(market_id, question, side, strategy, score):
         con.commit()
 
 def record_paper_bet(market_id, question, strategy_tag, side, entry_price,
-                     bet_size, bankroll, kelly_raw, edge_est, confidence, reason):
+                     bet_size, bankroll, kelly_raw, edge_est, confidence, reason,
+                     mode="ACTIVE"):
     with _conn() as con:
         cur = con.execute(
             """INSERT INTO paper_bets
                (market_id,question,strategy_tag,side,entry_price,bet_size,
-                bankroll_at,kelly_raw,edge_est,confidence,reason,placed_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                bankroll_at,kelly_raw,edge_est,confidence,reason,placed_at,mode)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (market_id, question, strategy_tag, side, entry_price, bet_size,
              bankroll, kelly_raw, edge_est, confidence, reason,
-             _utc_now().isoformat()))
+             _utc_now().isoformat(), mode))
         con.commit()
         return cur.lastrowid
 
