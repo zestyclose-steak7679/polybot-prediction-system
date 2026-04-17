@@ -161,9 +161,21 @@ def send_summary(
     open_bets = position_stats.get("n_open", 0)
     avg_hold = position_stats.get("avg_hold_hours", 0.0)
     try:
-        from data.database import get_open_bets
-        open_bets_db = len(get_open_bets())
-        db_line = f"DB: {open_bets_db} open in paper_bets\n\n"
+        from data.database import _conn
+        con = _conn()
+        open_bets_db = con.execute(
+            "SELECT COUNT(*) FROM paper_bets WHERE result='open'"
+        ).fetchone()[0]
+        last_error = ""
+        try:
+            last_shadow = con.execute(
+                "SELECT market_id, placed_at FROM paper_bets "
+                "WHERE mode='SHADOW' ORDER BY placed_at DESC LIMIT 1"
+            ).fetchone()
+            last_shadow_info = f"last: {last_shadow[0]}" if last_shadow else "none"
+        except Exception as ex:
+            last_shadow_info = f"err: {ex}"
+        db_line = f"DB: {open_bets_db} open | shadow {last_shadow_info}\n\n"
     except Exception:
         db_line = "DB: unknown\n\n"
     closed_this_cycle = cycle_metrics.get("closed_this_cycle", 0)
