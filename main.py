@@ -507,6 +507,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             new_alerts += 1
         elif exec_status == "shadow":
             new_alerts += 1 # We still consider it processed
+        elif exec_status == "shadow_skip":
+            pass # duplicate skip, do not increment
 
     cycle_metrics["executed_trades"] = new_alerts
     position_stats = get_open_position_stats()
