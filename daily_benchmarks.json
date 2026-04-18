@@ -1,10 +1,10 @@
 {
-  "date": "2026-04-17",
-  "signals_today": 307,
-  "bets_today": 40,
+  "date": "2026-04-18",
+  "signals_today": 9,
+  "bets_today": 2,
   "bankroll_start_of_day": 1000.0,
   "bankroll_current": 1000.0,
   "timeouts_today": 0,
   "closes_today": 0,
-  "last_checked": "2026-04-17T23:22:57.787708+00:00"
+  "last_checked": "2026-04-18T00:00:09.499029+00:00"
 }
