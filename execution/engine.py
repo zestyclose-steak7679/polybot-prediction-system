@@ -83,8 +83,12 @@ class ExecutionEngine:
                     f"size: {adjusted_bet} | confidence: {signal.confidence}"
                 )
             except Exception as e:
+                error_msg = str(e)[:80]
                 logger.error(
-                    f"SHADOW record FAILED | market: {market_id} | error: {e}"
+                    f"SHADOW record FAILED | market: {market_id} | error: {error_msg}"
+                )
+                self._notify_outcome(
+                    signal, "shadow", f"Executed in SHADOW mode | DB ERR: {error_msg}"
                 )
             return None, "shadow"
 
