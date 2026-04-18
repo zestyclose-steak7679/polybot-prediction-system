@@ -57,7 +57,6 @@ class ExecutionEngine:
                 f"edge: {signal.edge} | confidence: {signal.confidence}"
             )
             struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
-            self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
 
             # Skip if market already has open SHADOW bet
             from data.database import _conn
@@ -72,7 +71,9 @@ class ExecutionEngine:
                     f"SHADOW skip duplicate | market: {market_id} | "
                     f"existing bet id: {existing[0]}"
                 )
-                return None, "shadow"
+                return None, "shadow_skip"
+
+            self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
 
             try:
                 from scoring.engine import confidence_multiplier
