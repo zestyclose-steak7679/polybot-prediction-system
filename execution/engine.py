@@ -18,58 +18,25 @@ class ExecutionEngine:
 
     def _determine_mode(self, strategy: str) -> str:
         """
-        Promotion logic:
-        - SHADOW if insufficient data (< 30 closed bets)
-        - SHADOW if CLV is significantly negative (< -0.05)
-        - ACTIVE if 30+ closed bets AND CLV >= 0
-        - ACTIVE if 100+ closed bets AND CLV > -0.02 (lenient)
+        Check SHADOW vs ACTIVE mode.
+        A signal is ACTIVE if its strategy has positive CLV in shadow mode, else SHADOW.
         """
         stats = compute_strategy_roi(strategy)
 
         if stats is None:
-            struct_logger.info("PROMOTION", "unknown", "skipped",
-                {"strategy": strategy, "reason": "insufficient_data"})
+            struct_logger.info("PROMOTION", "unknown", "skipped", {"strategy": strategy, "reason": "insufficient_data"})
             return "SHADOW"
 
-        n_bets = stats.get("n_bets", 0)
         avg_clv = stats.get("avg_clv")
-
-        # Not enough closed bets to evaluate
-        if n_bets < 30:
-            struct_logger.info("PROMOTION", "unknown", "skipped",
-                {"strategy": strategy, "reason": "insufficient_bets",
-                 "n_bets": n_bets, "required": 30})
-            return "SHADOW"
-
-        # CLV not yet computed
         if avg_clv is None:
-            struct_logger.info("PROMOTION", "unknown", "skipped",
-                {"strategy": strategy, "reason": "no_clv_data",
-                 "n_bets": n_bets})
+            struct_logger.info("PROMOTION", "unknown", "skipped", {"strategy": strategy, "reason": "no_clv_data"})
             return "SHADOW"
 
-        # Significantly negative CLV — keep in SHADOW
         if avg_clv <= -0.05:
-            struct_logger.info("PROMOTION", "unknown", "skipped",
-                {"strategy": strategy, "reason": "negative_clv",
-                 "avg_clv": avg_clv, "n_bets": n_bets})
+            struct_logger.info("PROMOTION", "unknown", "skipped", {"strategy": strategy, "reason": "negative_clv", "avg_clv": avg_clv})
             return "SHADOW"
 
-        # Lenient promotion: 100+ bets, slightly negative ok
-        if n_bets >= 100 and avg_clv > -0.02:
-            struct_logger.info("PROMOTION", "unknown", "promoted",
-                {"strategy": strategy, "reason": "sufficient_data_lenient",
-                 "avg_clv": avg_clv, "n_bets": n_bets})
-            return "ACTIVE"
-
-        # Standard promotion: 30+ bets, non-negative CLV
-        if n_bets >= 30 and avg_clv >= 0:
-            struct_logger.info("PROMOTION", "unknown", "promoted",
-                {"strategy": strategy, "reason": "positive_clv",
-                 "avg_clv": avg_clv, "n_bets": n_bets})
-            return "ACTIVE"
-
-        return "SHADOW"
+        return "ACTIVE"
 
     def execute_signal(self, signal: Signal, bet_size: float, kelly_raw: float, decimal_odds: float) -> Tuple[Optional[int], str]:
         market_id = signal.market_id
@@ -90,24 +57,7 @@ class ExecutionEngine:
                 f"edge: {signal.edge} | confidence: {signal.confidence}"
             )
             struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
-
-            # Skip if market already has open SHADOW bet
-            from data.database import _conn
-            with _conn() as _c:
-                existing = _c.execute(
-                    "SELECT id FROM paper_bets "
-                    "WHERE market_id=? AND result='open' AND mode='SHADOW'",
-                    (market_id,)
-                ).fetchone()
-            if existing:
-                logger.info(
-                    f"SHADOW skip duplicate | market: {market_id} | "
-                    f"existing bet id: {existing[0]}"
-                )
-                return None, "shadow_skip"
-
             self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
-
             try:
                 from scoring.engine import confidence_multiplier
                 multiplier = confidence_multiplier(signal.confidence)
@@ -133,12 +83,8 @@ class ExecutionEngine:
                     f"size: {adjusted_bet} | confidence: {signal.confidence}"
                 )
             except Exception as e:
-                error_msg = str(e)[:80]
                 logger.error(
-                    f"SHADOW record FAILED | market: {market_id} | error: {error_msg}"
-                )
-                self._notify_outcome(
-                    signal, "shadow", f"Executed in SHADOW mode | DB ERR: {error_msg}"
+                    f"SHADOW record FAILED | market: {market_id} | error: {e}"
                 )
             return None, "shadow"
 

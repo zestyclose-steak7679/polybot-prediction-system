@@ -22,6 +22,24 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Restore state cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            polybot.db
+            polybot.db-wal
+            polybot.db-shm
+            bankroll.txt
+            peak_bankroll.txt
+            last_train.txt
+            killed_strategies.json
+            regime_state.json
+            last_weekly.txt
+            models/edge_model.pkl
+            models/regime_kmeans.pkl
+          key: polybot-state-v3-${{ github.run_id }}
+          restore-keys: polybot-state-v3-
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
@@ -33,19 +51,28 @@ jobs:
           BANKROLL: ${{ secrets.BANKROLL }}
 
       - name: Persist state
+
         if: always()
         run: |
           git config user.name "polybot"
-          git config user.email "polybot@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git fetch origin main
-          git checkout origin/main -- . 2>/dev/null || true
-          git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json daily_benchmarks.json last_weekly.txt || true
-          git stash 2>/dev/null || true
-          git pull origin main --rebase --autostash 2>/dev/null || true
-          git stash pop 2>/dev/null || true
-          git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json daily_benchmarks.json last_weekly.txt || true
+          git config user.email "bot@polybot"
+          git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json || true
+          git add daily_benchmarks.json last_weekly.txt || true
           git diff --staged --quiet || git commit -m "chore: state [skip ci]"
-          git push origin HEAD:main
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git pull origin main --rebase && git push origin HEAD
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save state cache
+
+        if: always()
+        run: |
+          git config user.name "polybot"
+          git config user.email "bot@polybot"
+          git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json daily_benchmarks.json
+          git diff --staged --quiet || git commit -m "chore: state [skip ci]"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git pull origin main --rebase && git push origin HEAD
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
