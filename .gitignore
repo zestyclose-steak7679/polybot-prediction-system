@@ -26,6 +26,4 @@ test_task4.py
 
 
 logs/
-polybot.db-journal
-polybot.db-wal
-polybot.db-shm
+polybot.db*
