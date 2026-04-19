@@ -198,6 +198,15 @@ def volume_spike_strategy(row: Mapping[str, Any]) -> Signal | None:
     # Confidence: more volume → higher confidence adjustment
     vol_boost  = min(np.log10(ratio) * 0.06, 0.08)
     confidence = min(price + vol_boost, 0.92)
+
+    # Reduce confidence for low-tension markets
+    tension = 1.0 - abs(yes_price - 0.5) * 2
+    if tension < 0.4:  # price outside 0.20-0.80 range
+        confidence = min(confidence, 0.65)
+        edge = confidence - price
+        if edge < EDGE_THRESHOLD:
+            return None
+
     edge       = confidence - price
 
     if edge < EDGE_THRESHOLD:
