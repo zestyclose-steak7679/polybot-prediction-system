@@ -10,21 +10,6 @@ from learning.tracker import compute_strategy_roi
 logger = logging.getLogger(__name__)
 struct_logger = get_structured_logger("execution.engine")
 
-def confidence_multiplier(confidence: float) -> float:
-    if confidence is None:
-        return 1.0
-    confidence = max(0.0, min(1.0, float(confidence)))
-    if confidence >= 0.75:
-        return 1.5
-    elif confidence >= 0.60:
-        return 1.25
-    elif confidence >= 0.45:
-        return 1.0
-    elif confidence >= 0.30:
-        return 0.75
-    else:
-        return 0.5
-
 class ExecutionEngine:
     STATES = {"SIGNAL_RECEIVED", "VALIDATED", "EXECUTED", "FAILED", "SHADOW"}
 
@@ -74,6 +59,7 @@ class ExecutionEngine:
             struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
             self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
             try:
+                from scoring.engine import confidence_multiplier
                 multiplier = confidence_multiplier(signal.confidence)
                 adjusted_bet = round(bet_size * multiplier, 2)
                 adjusted_bet = min(adjusted_bet, self.bankroll * 0.05)

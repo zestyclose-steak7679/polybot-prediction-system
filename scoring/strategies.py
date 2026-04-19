@@ -181,6 +181,11 @@ def volume_spike_strategy(row: Mapping[str, Any]) -> Signal | None:
     if ratio < VOLUME_SPIKE_RATIO:
         return None
 
+    # Avoid near-resolved markets (no edge possible)
+    yes_price = row.get("yes_price", 0.5)
+    if yes_price < 0.10 or yes_price > 0.90:
+        return None
+
     # With a volume spike, follow the price direction
     move  = row["one_day_change"]
     if move >= 0:
