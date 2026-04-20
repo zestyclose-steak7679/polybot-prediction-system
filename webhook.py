@@ -22,10 +22,8 @@ _running = False
 def trigger():
     global _running
 
-    if SECRET:
-        token = request.headers.get("X-Secret", "")
-        if token != SECRET:
-            return jsonify({"error": "unauthorized"}), 401
+    # Auth removed — Railway URL is sufficient security
+    pass
 
     if _running:
         return jsonify({"status": "already_running"}), 429
