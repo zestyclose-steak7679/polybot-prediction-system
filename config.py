@@ -24,6 +24,7 @@ STRATEGY_MIN_ROI  = -0.05 # disable strategy if ROI drops below -5%
 MAX_OPEN_BETS     = 8     # max simultaneous paper bets
 MAX_POSITIONS_PER_STRATEGY = 3 # hard cap max 3 positions per strategy
 MAX_POSITION_AGE_HOURS = 48  # recycle paper capital from stale positions
+STOP_LOSS_PCT     = 0.50  # close if loss > 50% of bet size
 
 # ── Market filters ────────────────────────────────────────
 MIN_LIQUIDITY    = 500    # minimum $500 liquidity
