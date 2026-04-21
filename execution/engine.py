@@ -46,6 +46,15 @@ class ExecutionEngine:
             struct_logger.info("VALIDATED", market_id, "skipped", {"reason": "zero_bet_size"})
             return None, "skipped"
 
+        from data.database import get_open_bets
+        from config import MAX_POSITIONS_PER_STRATEGY
+        open_bets = get_open_bets()
+        if not open_bets.empty:
+            strategy_count = len(open_bets[open_bets["strategy_tag"] == signal.strategy])
+            if strategy_count >= MAX_POSITIONS_PER_STRATEGY:
+                logger.info(f"STRATEGY_CAP: {signal.strategy} at {strategy_count} positions, skipping")
+                return None, "skipped"
+
         mode = self._determine_mode(signal.strategy)
         struct_logger.info("VALIDATED", market_id, "success", {"mode": mode})
 
