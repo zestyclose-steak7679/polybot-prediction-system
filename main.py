@@ -156,12 +156,6 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     cycle_metrics["open_bets"] = position_stats["n_open"]
     cycle_metrics["avg_hold_hours"] = position_stats["avg_hold_hours"]
 
-    # Send open positions update to Telegram
-    from data.database import get_open_positions_detail
-    open_positions_df = get_open_positions_detail()
-    if not open_positions_df.empty:
-        send_positions_update(open_positions_df)
-
     # 2. Risk checks
     risk_ok, risk_msgs = run_all_checks(bankroll)
     for m in risk_msgs: logger.info(m)
@@ -509,6 +503,13 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             new_alerts += 1 # We still consider it processed
 
     cycle_metrics["executed_trades"] = new_alerts
+
+    if cycle_metrics.get("closed_this_cycle", 0) > 0 or new_alerts > 0:
+        from data.database import get_open_positions_detail
+        open_positions_df = get_open_positions_detail()
+        if not open_positions_df.empty:
+            send_positions_update(open_positions_df)
+
     position_stats = get_open_position_stats()
     cycle_metrics["open_bets"] = position_stats["n_open"]
     cycle_metrics["avg_hold_hours"] = position_stats["avg_hold_hours"]
