@@ -62,15 +62,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Save state cache
-
-        if: always()
-        run: |
-          git config user.name "polybot"
-          git config user.email "bot@polybot"
-          git add polybot.db bankroll.txt peak_bankroll.txt last_train.txt regime_state.json killed_strategies.json daily_benchmarks.json
-          git diff --staged --quiet || git commit -m "chore: state [skip ci]"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git pull origin main --rebase && git push origin HEAD
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
