@@ -104,6 +104,22 @@ def run_all_checks(bankroll: float) -> tuple[bool, list[str]]:
         if not ok:
             return False, messages
 
+        from data.database import get_open_bets
+        from config import MAX_POSITIONS_PER_STRATEGY
+        open_bets = get_open_bets()
+
+        if not open_bets.empty and "strategy_tag" in open_bets.columns:
+            strategy_counts = open_bets["strategy_tag"].value_counts()
+            for strategy, count in strategy_counts.items():
+                if count >= MAX_POSITIONS_PER_STRATEGY:
+                    messages.append(
+                        f"Strategy cap reached: {strategy} has {count} open positions "
+                        f"(max {MAX_POSITIONS_PER_STRATEGY})"
+                    )
+                    # Don't halt entire bot — just log warning
+                    # Execution engine will skip new bets for this strategy
+                    logger.warning(messages[-1])
+
         return True, messages
     except Exception as e:
         logger.error(f"Error running risk checks: {e}")
