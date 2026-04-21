@@ -44,7 +44,6 @@ class ExecutionEngine:
 
         if bet_size <= 0:
             struct_logger.info("VALIDATED", market_id, "skipped", {"reason": "zero_bet_size"})
-            self._notify_outcome(signal, "skipped", "Zero bet size")
             return None, "skipped"
 
         mode = self._determine_mode(signal.strategy)
@@ -57,7 +56,6 @@ class ExecutionEngine:
                 f"edge: {signal.edge} | confidence: {signal.confidence}"
             )
             struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
-            self._notify_outcome(signal, "shadow", "Executed in SHADOW mode")
             try:
                 from scoring.engine import confidence_multiplier
                 multiplier = confidence_multiplier(signal.confidence)
