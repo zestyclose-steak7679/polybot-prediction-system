@@ -6,6 +6,7 @@ Telegram Bot API sender. Uses requests only.
 import logging
 import os
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -40,8 +41,14 @@ def _send(text: str) -> bool:
         return False
 
 
+_IST = ZoneInfo("Asia/Kolkata")
+
+
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+def _ist_now() -> datetime:
+    return datetime.now(_IST)
 
 
 def _console_safe(text: str) -> str:
@@ -79,7 +86,7 @@ def send_pick_alert(pick: dict, bankroll: float):
         f"Strategy:    {pick.get('strategy', 'N/A')}\n"
         f"Regime:      {pick.get('regime', 'N/A')}\n\n"
         f"💰 Bankroll: ${bankroll:,.2f}\n"
-        f"🕐 {_utc_now().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+        f"🕐 {_ist_now().strftime('%Y-%m-%d %H:%M IST')}\n\n"
         f"⚠️ Paper trade only."
     )
 
@@ -225,7 +232,7 @@ def send_summary(
 
     text = (
         f"📊 POLYBOT SUMMARY\n"
-        f"🕐 {_utc_now().strftime('%Y-%m-%d %H:%M UTC')}\n"
+        f"🕐 {_ist_now().strftime('%Y-%m-%d %H:%M IST')}\n"
         f"💰 Bankroll: ${bankroll:,.2f}\n"
         f"🔍 Signals: {signal_breakdown}\n\n"
         f"── PERFORMANCE ──\n"
@@ -290,7 +297,7 @@ def send_weekly_report(stats: dict) -> None:
     msg = (
         f"📅 <b>WEEKLY REPORT</b>\n"
         f"{'─'*28}\n"
-        f"Period: {stats['period']}\n\n"
+        f"Period: {stats['period']}\n🕐 {_ist_now().strftime('%Y-%m-%d %H:%M IST')}\n\n"
         f"<b>Performance</b>\n"
         f"  Bets: {stats['bets']}  |  W/L: {stats['wins']}/{stats['losses']}\n"
         f"  Win rate: {stats['win_rate']:.1f}%\n"
@@ -317,9 +324,9 @@ def send_positions_update(positions_df) -> None:
     if not token or not chat_id:
         return
     if positions_df.empty:
-        msg = "📭 <b>OPEN POSITIONS</b>\n\nNo open positions."
+        msg = f"📭 <b>OPEN POSITIONS</b>\n🕐 {_ist_now().strftime('%Y-%m-%d %H:%M IST')}\n\nNo open positions."
     else:
-        lines = ["📊 <b>OPEN POSITIONS</b>\n"]
+        lines = [f"📊 <b>OPEN POSITIONS</b>\n🕐 {_ist_now().strftime('%Y-%m-%d %H:%M IST')}\n"]
         total_unrealised = 0.0
         for _, row in positions_df.iterrows():
             pnl = row.get("unrealised_pnl", 0.0) or 0.0
