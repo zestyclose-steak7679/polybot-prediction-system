@@ -525,12 +525,10 @@ def get_open_positions_detail() -> pd.DataFrame:
                     pb.placed_at,
                     ROUND((julianday('now') - julianday(pb.placed_at)) * 24, 1) as hold_hours,
                     ph.yes_price as current_price,
-                    ROUND(
-                        CASE pb.side
-                            WHEN 'YES' THEN (ph.yes_price - pb.entry_price) * pb.bet_size
-                            ELSE (pb.entry_price - ph.yes_price) * pb.bet_size
-                        END, 2
-                    ) as unrealised_pnl
+                    CASE pb.side
+                        WHEN 'YES' THEN ROUND(pb.bet_size * (ph.yes_price / NULLIF(pb.entry_price, 0) - 1), 2)
+                        ELSE ROUND(pb.bet_size * ((1.0 - ph.yes_price) / NULLIF(1.0 - pb.entry_price, 0) - 1), 2)
+                    END as unrealised_pnl
                 FROM paper_bets pb
                 LEFT JOIN (
                     SELECT market_id, yes_price,
