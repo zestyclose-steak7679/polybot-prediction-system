@@ -6,6 +6,7 @@ from alerts.telegram import _send
 from data.database import record_paper_bet
 from scoring.strategies import Signal
 from learning.tracker import compute_strategy_roi
+from config import MAX_POSITIONS_PER_STRATEGY
 
 logger = logging.getLogger(__name__)
 struct_logger = get_structured_logger("execution.engine")
@@ -47,12 +48,16 @@ class ExecutionEngine:
             return None, "skipped"
 
         from data.database import get_open_bets
-        from config import MAX_POSITIONS_PER_STRATEGY
         open_bets = get_open_bets()
         if not open_bets.empty:
-            strategy_count = len(open_bets[open_bets["strategy_tag"] == signal.strategy])
+            strategy_count = len(
+                open_bets[open_bets["strategy_tag"] == signal.strategy]
+            )
             if strategy_count >= MAX_POSITIONS_PER_STRATEGY:
-                logger.info(f"STRATEGY_CAP: {signal.strategy} at {strategy_count} positions, skipping")
+                logger.info(
+                    f"STRATEGY_CAP: {signal.strategy} at "
+                    f"{strategy_count} positions — skipping"
+                )
                 return None, "skipped"
 
         mode = self._determine_mode(signal.strategy)
