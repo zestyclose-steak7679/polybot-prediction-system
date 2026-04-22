@@ -7,7 +7,6 @@ import logging
 import os
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
-from config import MAX_POSITION_AGE_HOURS
 
 import requests
 
@@ -165,32 +164,31 @@ def send_summary(
     sharpe = stats.get('sharpe', 0.0)
     sharpe_val = sharpe if sharpe is not None else 0.0
 
-    # Status indicators
-    clv_val = clv_stats.get("avg_clv", 0.0) or 0.0
-    clv_icon = "✅" if clv_val >= 0.01 else ("⚠️" if clv_val >= 0 else "❌")
+    # Open Positions
+    open_bets = position_stats.get("n_open", 0)
+    avg_hold = position_stats.get("avg_hold_hours", 0.0)
+    try:
+        from data.database import _conn
+        con = _conn()
+        open_bets_db = con.execute(
+            "SELECT COUNT(*) FROM paper_bets WHERE result='open'"
+        ).fetchone()[0]
+        last_error = ""
+        try:
+            last_shadow = con.execute(
+                "SELECT market_id, placed_at FROM paper_bets "
+                "WHERE mode='SHADOW' ORDER BY placed_at DESC LIMIT 1"
+            ).fetchone()
+            last_shadow_info = f"last: {last_shadow[0]}" if last_shadow else "none"
+        except Exception as ex:
+            last_shadow_info = f"err: {ex}"
+        db_line = f"DB: {open_bets_db} open | shadow {last_shadow_info}\n\n"
+    except Exception:
+        db_line = "DB: unknown\n\n"
+    closed_this_cycle = cycle_metrics.get("closed_this_cycle", 0)
+    timeout_closed = cycle_metrics.get("timeout_closed_this_cycle", 0)
 
-    roi_val = stats.get("roi", 0.0) or 0.0
-    pnl_val = stats.get("total_pnl", 0.0) or 0.0
-    pnl_sign = "+" if pnl_val >= 0 else ""
-
-    win_rate = stats.get("win_rate", 0.0) or 0.0
-    wr_icon = "✅" if win_rate >= 50 else ("⚠️" if win_rate >= 40 else "❌")
-
-    open_bets = position_stats.get("n_open", 0) if position_stats else 0
-    avg_hold = position_stats.get("avg_hold_hours", 0.0) if position_stats else 0.0
-    stale = position_stats.get("stale_count", 0) if position_stats else 0
-
-    raw_signals = cycle_metrics.get("raw_signals", 0) if cycle_metrics else 0
-    executed = cycle_metrics.get("executed_trades", 0) if cycle_metrics else 0
-    closed = cycle_metrics.get("closed_this_cycle", 0) if cycle_metrics else 0
-    timeouts = cycle_metrics.get("timeout_closed_this_cycle", 0) if cycle_metrics else 0
-    blocked_threshold = cycle_metrics.get("blocked_by_threshold", 0) if cycle_metrics else 0
-
-    wins = stats.get("wins", 0)
-    losses = stats.get("losses", 0)
-    total_closed = wins + losses
-
-    # Strategy lines
+    # Strategies
     from risk.strategy_killer import _load_killed
     from config import STRATEGY_MIN_ROI
     killed_log = _load_killed()
@@ -201,63 +199,56 @@ def send_summary(
         if name in active_strategies:
             strat_items.append(f"✅ {name}")
         elif tracker_active is not None and name in tracker_active:
-            strat_items.append(f"⏸ {name}")
+            strat_items.append(f"⏸ {name} (regime filtered)")
         else:
             reason = killed_log.get(name, {}).get("reason") if isinstance(killed_log.get(name), dict) else None
+            # If strategy is disabled by tracker.py instead of killer, it won't have a reason in killed_log
             if not reason:
-                roi_s = s.get("roi")
-                reason = f"ROI {roi_s*100:.1f}%" if roi_s is not None else "disabled"
+                roi_val = s.get("roi")
+                if roi_val is not None and roi_val < STRATEGY_MIN_ROI:
+                    reason = f"ROI {roi_val*100:.1f}% < {STRATEGY_MIN_ROI*100:.0f}%"
+                else:
+                    reason = "disabled"
             strat_items.append(f"❌ {name} ({reason})")
 
-    strat_line = " | ".join(strat_items)
+    strat_line = "    | ".join(strat_items)
 
-    # Risk assessment
-    risk_lines = []
-    if clv_val < 0 and total_closed >= 10:
-        risk_lines.append(f"❌ CLV negative — edge not confirmed")
-    elif clv_val < 0.01 and total_closed < 30:
-        risk_lines.append(f"⚠️ CLV unconfirmed — need {30 - total_closed} more closed bets")
-    else:
-        risk_lines.append(f"✅ CLV positive — edge confirmed")
+    # Alpha Shadow
+    alpha_lines = ""
+    for alpha in (alpha_stats or [])[:3]:
+        alpha_lines += (
+            f"{alpha['alpha_name']:<14} CLV {alpha.get('avg_clv', 0):.2f}  "
+            f"Hit {alpha.get('positive_rate', 0) * 100:.0f}%  n={alpha.get('n', 0)}\n"
+        )
 
-    if stale > 0:
-        risk_lines.append(f"⚠️ {stale} position(s) stale (>{MAX_POSITION_AGE_HOURS}h)")
-    else:
-        risk_lines.append(f"✅ No stale positions")
+    regime = clv_stats.get("regime", "N/A")
 
-    # Action block
-    action_lines = []
-    if total_closed < 30:
-        action_lines.append(f"→ Accumulate data: {total_closed}/30 closed bets")
-    if stale > 0:
-        action_lines.append(f"→ {stale} position(s) timing out soon")
-    if clv_val < -0.05 and total_closed >= 10:
-        action_lines.append(f"→ Review signal quality — CLV critically negative")
-
-    if not action_lines:
-        action_lines.append("→ No action required — system healthy")
+    raw_signals = cycle_metrics.get("raw_signals", 0)
+    blocked_by_threshold = cycle_metrics.get("blocked_by_threshold", 0)
+    blocked_by_risk = cycle_metrics.get("blocked_by_risk", 0)
+    executed_trades = cycle_metrics.get("executed_trades", 0)
+    avg_confidence = cycle_metrics.get("avg_confidence")
+    signal_breakdown = f"{raw_signals} raw | {blocked_by_threshold} no edge | {blocked_by_risk} risk blocked | {executed_trades} executed"
 
     text = (
-        f"📊 POLYBOT — {_ist_now().strftime('%d %b %H:%M IST')}\n\n"
-        f"💰 ${bankroll:,.2f} | "
-        f"{wr_icon} {win_rate:.0f}% win | "
-        f"ROI: {pnl_sign}{roi_val:.2f}%\n"
-        f"CLV: {clv_val:.3f} {clv_icon} | "
-        f"Regime: {clv_stats.get('regime','N/A')} | "
-        f"Model: {model_mode}\n\n"
-        f"── CYCLE ──\n"
-        f"Signals: {raw_signals} raw → {executed} executed"
-        f" ({blocked_threshold} no edge)\n"
-        f"Closed: {closed}"
-        f"{f' ({timeouts} timeout)' if timeouts > 0 else ''} "
-        f"| Open: {open_bets}"
-        f"{f' | ⚠️ {stale} stale' if stale > 0 else ''}\n\n"
-        f"── RISK ──\n"
-        + "\n".join(risk_lines) + "\n\n"
+        f"📊 POLYBOT SUMMARY\n"
+        f"🕐 {_ist_now().strftime('%Y-%m-%d %H:%M IST')}\n"
+        f"💰 Bankroll: ${bankroll:,.2f}\n"
+        f"🔍 Signals: {signal_breakdown}\n\n"
+        f"── PERFORMANCE ──\n"
+        f"Bets: {total_bets}  |  W/L: {wins}/{losses}  |  Win rate: {win_rate:.1f}%\n"
+        f"ROI: {pnl_sign}{roi:.2f}%  |  P&L: {pnl_sign}${pnl:.2f}\n"
+        f"Avg CLV: {avg_clv_val:.3f}  |  Sharpe: {sharpe_val:.3f}\n\n"
+        f"── POSITIONS ──\n"
+        f"Open: {open_bets}  |  Avg hold: {avg_hold:.1f}h\n"
+        f"Closed this cycle: {closed_this_cycle}  |  Timeouts: {timeout_closed}\n"
+        f"{db_line}"
         f"── STRATEGIES ──\n"
         f"{strat_line}\n\n"
-        f"── ACTION ──\n"
-        + "\n".join(action_lines) + "\n"
+        f"── ALPHA SHADOW ──\n"
+        f"{alpha_lines}\n"
+        f"── MODEL ──\n"
+        f"{model_mode}  |  Regime: {regime}  |  META: {round(avg_confidence, 2) if avg_confidence is not None else '-'}\n"
         f"{'─' * 28}"
     )
 

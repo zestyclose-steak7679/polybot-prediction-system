@@ -2,7 +2,7 @@
 
 REGIME_STRATEGY_MAP = {
     "trending":       ["momentum"],
-    "mean_reverting": ["reversal"],
+    "mean_reverting": ["reversal", "momentum"],
     "volatile":       ["reversal", "volume_spike"],
     "illiquid_spike": ["volume_spike", "momentum"],
     "neutral":        ["momentum", "reversal", "volume_spike"],
