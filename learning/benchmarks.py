@@ -48,6 +48,7 @@ def _fresh_benchmarks(date: str) -> dict:
         "timeouts_today": 0,
         "closes_today": 0,
         "last_checked": None,
+        "last_benchmark_alert": None,
     }
 
 def save_benchmarks(data: dict) -> None:
@@ -77,6 +78,9 @@ def check_benchmarks(data: dict, clv_stats: dict,
     Check all benchmarks and return list of violations.
     Each violation is a dict with 'metric', 'expected', 'actual', 'severity'.
     """
+    if data.get("last_benchmark_alert") == datetime.now(UTC).date().isoformat():
+        return []
+
     violations = []
 
     # Only check benchmarks after 8 PM UTC (end of trading day)
@@ -178,3 +182,10 @@ def send_benchmark_alert(violations: list, data: dict, bankroll: float) -> None:
     ])
 
     _send("\n".join(lines))
+
+    try:
+        data = load_benchmarks()
+        data["last_benchmark_alert"] = datetime.now(UTC).date().isoformat()
+        save_benchmarks(data)
+    except Exception as e:
+        logger.error("Failed to update benchmark alert cooldown: %s", e)
