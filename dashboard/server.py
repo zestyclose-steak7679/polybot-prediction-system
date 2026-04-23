@@ -269,11 +269,14 @@ def api_data():
     # Equity curve (last 100 trades)
     eq_bets = _q("""SELECT placed_at, pnl FROM paper_bets
                     WHERE result!='open' ORDER BY placed_at LIMIT 100""")
-    equity_curve = []
-    br = initial
-    for _, row in eq_bets.iterrows():
-        br += (row["pnl"] or 0)
-        equity_curve.append({"date": str(row["placed_at"])[:10], "bankroll": round(br,2)})
+    if eq_bets.empty:
+        equity_curve = []
+    else:
+        eq_bets["bankroll"] = initial + eq_bets["pnl"].fillna(0).cumsum()
+        equity_curve = eq_bets.assign(
+            date=eq_bets["placed_at"].astype(str).str[:10],
+            bankroll=eq_bets["bankroll"].round(2)
+        )[["date", "bankroll"]].to_dict(orient="records")
 
     # CLV histogram
     clv_bins = []
