@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify
 import os
 import threading
 import logging
@@ -22,8 +22,11 @@ _running = False
 def trigger():
     global _running
 
-    # Auth removed — Railway URL is sufficient security
-    pass
+    # Verify secret
+    received_secret = request.headers.get("X-Webhook-Secret")
+    if not SECRET or received_secret != SECRET:
+        logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
+        return jsonify({"status": "unauthorized"}), 401
 
     if _running:
         return jsonify({"status": "already_running"}), 429
