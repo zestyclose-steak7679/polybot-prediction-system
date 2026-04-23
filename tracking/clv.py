@@ -164,29 +164,34 @@ def settle_and_compute_clv(bankroll: float) -> tuple[float, dict]:
         current_price = current["yes_price"]
         hours_open_val = hours_open(bet.get("placed_at", ""))
 
-        # Stop loss check
         direction = 1 if bet["side"] == "YES" else -1
-        unrealised_pnl = (current_price - bet["entry_price"]) * direction * bet["bet_size"]
-        stop_loss_threshold = -abs(bet["bet_size"]) * STOP_LOSS_PCT
+        unrealised_pnl = (
+            (current_price - bet["entry_price"])
+            * direction * bet["bet_size"]
+        )
+        stop_threshold = -abs(bet["bet_size"]) * STOP_LOSS_PCT
 
-        if unrealised_pnl < stop_loss_threshold:
+        if unrealised_pnl < stop_threshold:
             pnl = round(unrealised_pnl, 4)
-            clv = round((current_price - bet["entry_price"]) * direction, 5)
+            clv_val = round(
+                (current_price - bet["entry_price"]) * direction, 5
+            )
             bankroll += bet["bet_size"] + pnl
+            stats["returned_capital"] += bet["bet_size"] + pnl
             close_bet(
                 bet_id=bet["id"],
                 exit_price=current_price,
                 closing_price=current_price,
                 result="stop_loss",
                 pnl=pnl,
-                clv=clv,
+                clv=clv_val,
             )
             stats["closed_count"] += 1
             logger.warning(
                 f"STOP_LOSS | #{bet['id']} [{bet['strategy_tag']}] "
-                f"unrealised={pnl:.2f} threshold={stop_loss_threshold:.2f}"
+                f"pnl={pnl:.2f} threshold={stop_threshold:.2f}"
             )
-            continue  # skip rest of processing for this bet
+            continue
 
         # Determine if market resolved
         is_resolved = (
