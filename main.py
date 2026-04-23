@@ -451,6 +451,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
 
     # 14. Alert + log
     new_alerts = 0
+    shadow_count = 0
     for alloc, bet_size in zip(allocations, sizes_list):
         engine = ExecutionEngine(bankroll)
         sig    = alloc["signal"]
@@ -500,9 +501,10 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
             bankroll -= bet_size
             new_alerts += 1
         elif exec_status == "shadow":
-            new_alerts += 1 # We still consider it processed
+            shadow_count += 1
 
     cycle_metrics["executed_trades"] = new_alerts
+    cycle_metrics["shadow_trades"] = shadow_count
 
     if cycle_metrics.get("closed_this_cycle", 0) > 0 or new_alerts > 0:
         from data.database import get_open_positions_detail
