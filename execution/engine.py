@@ -1,4 +1,5 @@
 import logging
+import pandas as pd
 import time
 from typing import Optional, Tuple
 from utils.logger import get_structured_logger
@@ -64,13 +65,18 @@ class ExecutionEngine:
         from data.database import get_open_bets
         open_bets = get_open_bets()
         if not open_bets.empty:
+            # Only count ACTIVE bets — SHADOW bets don't consume real capital
+            active_bets = open_bets[
+                open_bets.get("mode", pd.Series(["ACTIVE"] * len(open_bets))) == "ACTIVE"
+            ] if "mode" in open_bets.columns else open_bets
+
             strategy_count = len(
-                open_bets[open_bets["strategy_tag"] == signal.strategy]
+                active_bets[active_bets["strategy_tag"] == signal.strategy]
             )
             if strategy_count >= MAX_POSITIONS_PER_STRATEGY:
                 logger.info(
                     f"STRATEGY_CAP: {signal.strategy} at "
-                    f"{strategy_count} positions — skipping"
+                    f"{strategy_count} ACTIVE positions — skipping"
                 )
                 return None, "skipped"
 
