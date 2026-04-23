@@ -227,8 +227,11 @@ def send_summary(
     blocked_by_threshold = cycle_metrics.get("blocked_by_threshold", 0)
     blocked_by_risk = cycle_metrics.get("blocked_by_risk", 0)
     executed_trades = cycle_metrics.get("executed_trades", 0)
+    shadow_count = cycle_metrics.get("shadow_trades", 0)
     avg_confidence = cycle_metrics.get("avg_confidence")
-    signal_breakdown = f"{raw_signals} raw | {blocked_by_threshold} no edge | {blocked_by_risk} risk blocked | {executed_trades} executed"
+
+    shadow_str = f" | {shadow_count} shadow" if shadow_count > 0 else ""
+    signal_breakdown = f"{raw_signals} raw → {executed_trades} active{shadow_str}  ({blocked_by_threshold} no edge)"
 
     text = (
         f"📊 POLYBOT SUMMARY\n"
