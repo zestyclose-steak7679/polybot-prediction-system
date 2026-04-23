@@ -3,7 +3,7 @@ import time
 from typing import Optional, Tuple
 from utils.logger import get_structured_logger
 from alerts.telegram import _send
-from data.database import record_paper_bet
+from data.database import record_paper_bet, get_closed_bets
 from scoring.strategies import Signal
 from learning.tracker import compute_strategy_roi
 from config import MAX_POSITIONS_PER_STRATEGY
@@ -33,10 +33,24 @@ class ExecutionEngine:
             struct_logger.info("PROMOTION", "unknown", "skipped", {"strategy": strategy, "reason": "no_clv_data"})
             return "SHADOW"
 
-        if avg_clv <= -0.05:
-            struct_logger.info("PROMOTION", "unknown", "skipped", {"strategy": strategy, "reason": "negative_clv", "avg_clv": avg_clv})
-            return "SHADOW"
+        # Warmup gate: use lenient threshold before 30 closed bets
+        try:
+            closed_bets = get_closed_bets(limit=500)
+            n_closed = len(closed_bets) if not closed_bets.empty else 0
+        except Exception:
+            n_closed = 0
 
+        clv_threshold = -0.20 if n_closed < 30 else -0.05
+
+        if avg_clv <= clv_threshold:
+            struct_logger.info("PROMOTION", "unknown", "skipped", {
+                "strategy": strategy,
+                "reason": "negative_clv",
+                "avg_clv": avg_clv,
+                "threshold": clv_threshold,
+                "n_closed": n_closed
+            })
+            return "SHADOW"
         return "ACTIVE"
 
     def execute_signal(self, signal: Signal, bet_size: float, kelly_raw: float, decimal_odds: float) -> Tuple[Optional[int], str]:
