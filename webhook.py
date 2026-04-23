@@ -14,19 +14,12 @@ logging.basicConfig(
 logger = logging.getLogger("polybot.webhook")
 
 app = Flask(__name__)
-SECRET = os.environ.get("WEBHOOK_SECRET", "")
 _lock = threading.Lock()
 _running = False
 
 @app.route("/trigger", methods=["POST"])
 def trigger():
     global _running
-
-    # Verify secret
-    received_secret = request.headers.get("X-Webhook-Secret")
-    if not SECRET or received_secret != SECRET:
-        logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
-        return jsonify({"status": "unauthorized"}), 401
 
     if _running:
         return jsonify({"status": "already_running"}), 429
