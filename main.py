@@ -588,6 +588,25 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     )
 
     save_bankroll(bankroll)
+    try:
+        import sqlite3 as _sqlite3
+        from config import DB_PATH as _DB_PATH
+        with _sqlite3.connect(_DB_PATH) as _conn:
+            _conn.execute("""
+                CREATE TABLE IF NOT EXISTS bankroll_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bankroll REAL NOT NULL,
+                    logged_at TEXT NOT NULL
+                )
+            """)
+            _conn.execute(
+                "INSERT INTO bankroll_log (bankroll, logged_at) VALUES (?, ?)",
+                (round(bankroll, 2),
+                 datetime.now(UTC).replace(tzinfo=None).isoformat())
+            )
+            _conn.commit()
+    except Exception as _e:
+        logger.warning("bankroll_log insert failed (non-fatal): %s", _e)
 
     from learning.benchmarks import update_benchmarks, check_benchmarks, send_benchmark_alert
     benchmark_data = update_benchmarks(
