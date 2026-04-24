@@ -53,6 +53,52 @@ def health():
         "running": _running
     }), 200
 
+@app.route("/api/state", methods=["GET"])
+def api_state():
+    import sqlite3, json
+    try:
+        con = sqlite3.connect("polybot.db")
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+
+        # Bankroll
+        try:
+            bankroll = float(open("bankroll.txt").read().strip())
+        except:
+            bankroll = 1000.0
+
+        # Open positions
+        cur.execute("SELECT * FROM paper_bets WHERE result='open' ORDER BY placed_at DESC LIMIT 20")
+        open_bets = [dict(r) for r in cur.fetchall()]
+
+        # Closed bets
+        cur.execute("SELECT * FROM paper_bets WHERE result!='open' ORDER BY id DESC LIMIT 50")
+        closed_bets = [dict(r) for r in cur.fetchall()]
+
+        # Strategy stats
+        cur.execute("SELECT strategy_tag as strategy, COUNT(*) as total, SUM(clv) as total_clv FROM paper_bets WHERE result!='open' GROUP BY strategy_tag")
+        strategies = [dict(r) for r in cur.fetchall()]
+
+        # Bankroll history (simulated from trade_history since bankroll_history doesn't exist)
+        try:
+            cur.execute("SELECT * FROM trade_history ORDER BY closed_at DESC LIMIT 100")
+            history = [dict(r) for r in cur.fetchall()]
+        except:
+            history = []
+
+        con.close()
+
+        return jsonify({
+            "bankroll": bankroll,
+            "open_bets": open_bets,
+            "closed_bets": closed_bets,
+            "strategies": strategies,
+            "bankroll_history": history,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/", methods=["GET"])
 def root():
     return jsonify({"service": "polybot-webhook"}), 200
