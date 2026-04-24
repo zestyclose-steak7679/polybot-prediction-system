@@ -4,6 +4,7 @@ import threading
 import logging
 import sys
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -86,8 +87,11 @@ def api_state():
         cur.execute("SELECT strategy_tag as strategy, COUNT(*) as total, SUM(clv) as total_clv FROM paper_bets WHERE result!='open' GROUP BY strategy_tag")
         strategies = [dict(r) for r in cur.fetchall()]
 
-        cur.execute("SELECT * FROM market_log ORDER BY rowid DESC LIMIT 100")
-        history = [dict(r) for r in cur.fetchall()]
+        try:
+            cur.execute("SELECT ts, value FROM bankroll_log ORDER BY ts ASC")
+            history = [{"time": r[0], "value": r[1]} for r in cur.fetchall()]
+        except:
+            history = []
 
         con.close()
 
@@ -96,7 +100,7 @@ def api_state():
             "open_bets": open_bets,
             "closed_bets": closed_bets,
             "strategies": strategies,
-            "market_log": history,
+            "bankroll_history": history,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
