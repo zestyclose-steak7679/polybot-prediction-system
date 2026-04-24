@@ -52,7 +52,41 @@ def health():
         "status": "ok",
         "running": _running
     }), 200
+@app.route("/api/state", methods=["GET"])
+def api_state():
+    try:
+        con = sqlite3.connect("polybot.db")
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
 
+        try:
+            bankroll = float(open("bankroll.txt").read().strip())
+        except:
+            bankroll = 1000.0
+
+        cur.execute("SELECT * FROM bets WHERE status='open' ORDER BY placed_at DESC LIMIT 20")
+        open_bets = [dict(r) for r in cur.fetchall()]
+
+        cur.execute("SELECT * FROM bets WHERE status='closed' ORDER BY rowid DESC LIMIT 50")
+        closed_bets = [dict(r) for r in cur.fetchall()]
+
+        cur.execute("SELECT strategy, COUNT(*) as total, SUM(clv) as total_clv FROM bets WHERE status='closed' GROUP BY strategy")
+        strategies = [dict(r) for r in cur.fetchall()]
+
+        cur.execute("SELECT * FROM bankroll_history ORDER BY timestamp DESC LIMIT 100")
+        history = [dict(r) for r in cur.fetchall()]
+
+        con.close()
+
+        return jsonify({
+            "bankroll": bankroll,
+            "open_bets": open_bets,
+            "closed_bets": closed_bets,
+            "strategies": strategies,
+            "bankroll_history": history,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 @app.route("/api/state", methods=["GET"])
 def api_state():
     import sqlite3, json
