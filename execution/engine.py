@@ -56,10 +56,10 @@ class ExecutionEngine:
 
     def execute_signal(self, signal: Signal, bet_size: float, kelly_raw: float, decimal_odds: float) -> Tuple[Optional[int], str]:
         market_id = signal.market_id
-        struct_logger.info("SIGNAL_RECEIVED", market_id, "pending", {"strategy": signal.strategy, "bet_size": bet_size})
+        struct_logger.debug("SIGNAL_RECEIVED", market_id, "pending", {"strategy": signal.strategy, "bet_size": bet_size})
 
         if bet_size <= 0:
-            struct_logger.info("VALIDATED", market_id, "skipped", {"reason": "zero_bet_size"})
+            struct_logger.debug("VALIDATED", market_id, "skipped", {"reason": "zero_bet_size"})
             return None, "skipped"
 
         from data.database import get_open_bets
@@ -81,7 +81,7 @@ class ExecutionEngine:
                 return None, "skipped"
 
         mode = self._determine_mode(signal.strategy)
-        struct_logger.info("VALIDATED", market_id, "success", {"mode": mode})
+        struct_logger.debug("VALIDATED", market_id, "success", {"mode": mode})
 
         if mode == "SHADOW":
             signal.mode = "SHADOW"
@@ -89,7 +89,7 @@ class ExecutionEngine:
                 f"SHADOW gate check | strategy: {signal.strategy} | "
                 f"edge: {signal.edge} | confidence: {signal.confidence}"
             )
-            struct_logger.info("SHADOW", market_id, "logged", {"strategy": signal.strategy})
+            struct_logger.debug("SHADOW", market_id, "logged", {"strategy": signal.strategy})
             try:
                 from scoring.engine import confidence_multiplier
                 multiplier = confidence_multiplier(signal.confidence)
