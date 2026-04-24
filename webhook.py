@@ -37,6 +37,17 @@ def trigger():
             bankroll = load_bankroll()
             bankroll = run_cycle(bankroll)
             save_bankroll(bankroll)
+            try:
+                con = sqlite3.connect("polybot.db")
+                con.execute("CREATE TABLE IF NOT EXISTS bankroll_log (ts TEXT, value REAL)")
+                con.execute("INSERT INTO bankroll_log (ts, value) VALUES (?, ?)", 
+                            (datetime.utcnow().isoformat(), bankroll))
+                con.commit()
+                con.close()
+            except Exception as e:
+                logger.error(f"Bankroll log error: {e}")
+
+            
             logger.info("Webhook cycle complete")
         except Exception as e:
             logger.error(f"Webhook cycle failed: {e}")
@@ -91,7 +102,6 @@ def api_state():
         return jsonify({"error": str(e)}), 500
 @app.route("/api/state", methods=["GET"])  # already exists, skip
 
-@app.route("/", methods=["GET"])
 def root():
     return jsonify({"service": "polybot-webhook"}), 200
 
