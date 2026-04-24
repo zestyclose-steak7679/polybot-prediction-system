@@ -1,251 +1,129 @@
-# 🤖 Polybot — Autonomous Prediction Market Trading System
+# POLYBOT — Prediction Market Shadow Trading System
 
-> A self-improving, signal-driven trading bot for [Polymarket](https://polymarket.com) — built for learning, designed for real edge.
+> Autonomous paper trading bot for Polymarket. Generates signals, executes shadow bets, tracks CLV, and reports via Telegram.
 
-[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
-[![GitHub Actions](https://img.shields.io/badge/hosting-GitHub%20Actions-2088FF)](https://github.com/features/actions)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Status: Paper Trading](https://img.shields.io/badge/status-paper%20trading-yellow.svg)](#)
+## Overview
+Brief 2-3 sentence description of what Polybot does:
+- Fetches prediction markets from Polymarket's Gamma API
+- Generates signals via momentum, reversal, and volume_spike strategies
+- Executes paper/shadow trades, tracks performance, reports via Telegram
+- Runs autonomously every 15 minutes via Railway + cron-job.org
 
----
+## Architecture
 
-## What Is This?
-
-Polybot is an automated prediction market trading system that fetches real Polymarket markets, scores them using engineered signals, manages risk with Kelly sizing, and either paper-trades or executes live. It runs 24/7 for free via GitHub Actions.
-
-**The honest framing:** this is a learning project built with serious architectural depth. Whether it generates real profit depends entirely on whether the underlying signals have positive Closing Line Value (CLV) over time — not on the sophistication of the system around them. Architecture doesn't create alpha. Data does.
-
----
-
-## System Architecture
-
-```
-[DATA ENGINE]
-      ↓
-[PROBABILITY ENGINE]  ← 17 engineered features, GBM meta-model
-      ↓
-[ALPHA ENGINE]        ← signal scoring, edge decay, shadow strategies
-      ↓
-[REGIME DETECTOR]     ← MiniBatchKMeans market clustering
-      ↓
-[RISK MANAGER]        ← Kelly sizing, drawdown control, correlation matrix
-      ↓
-[EXECUTION ENGINE]    ← paper trades or live CLOB orders
-      ↓
-[EVALUATION ENGINE]   ← CLV tracking, Sharpe, Brier score
-      ↓
-  (feedback loop into models)
+### Execution Flow
+```text
+cron-job.org (every 15min)
+  → POST /trigger → Railway Flask webhook (webhook.py)
+    → run_cycle() in main.py
+      → fetch_markets() → apply_filters() → run_strategies()
+      → allocate() → execute_signal() → record_paper_bet()
+      → settle_and_compute_clv() → send_summary() via Telegram
 ```
 
-### Layer 1 — Data Engine
-- Polymarket Gamma API (no auth required) for market fetching
-- Price history tracking across 30-minute cycles
-- Stale market detection, volume validation, price history integrity checks
-- SQLite persistence (`polybot.db`)
+### Module Map
+| Module | File | Purpose |
+|--------|------|---------|
+| Webhook server | webhook.py | Flask app, receives cron triggers |
+| Main cycle | main.py | Orchestrates full trading cycle |
+| Market data | data/markets.py | Fetches from Gamma API |
+| Filters | scoring/filters.py | Liquidity, volume, price filters |
+| Strategies | scoring/strategies.py | momentum, reversal, volume_spike |
+| Execution | execution/engine.py | SHADOW/ACTIVE routing |
+| Settlement | tracking/clv.py | CLV tracking, timeout settlement |
+| Database | data/database.py | SQLite schema + queries |
+| Alerts | alerts/telegram.py | All Telegram notifications |
+| Config | config.py | All configurable parameters |
 
-### Layer 2 — Probability Engine
-- 17 engineered features: momentum ratios, z-scores, volume spike ratios, time-to-resolution, liquidity flags
-- `GradientBoostingClassifier` / `GradientBoostingRegressor` trained on CLV targets (not PnL)
-- Walk-forward training to prevent lookahead bias
+## Stack
+- **Runtime**: Python 3.11
+- **Infrastructure**: Railway (webhook server) + cron-job.org (scheduler)
+- **Database**: SQLite (`polybot.db`) on Railway disk
+- **Alerts**: Telegram Bot API
+- **State backup**: Git commit on each Railway run
+- **Dashboard**: Vercel Next.js → Railway `/api/state` endpoint
+- **CI/CD**: GitHub Actions (manual trigger only via workflow_dispatch)
 
-### Layer 3 — Alpha Engine
-- Three competing active strategies with Sharpe-weighted meta-model allocation
-- Two shadow alpha strategies (`late_drift`, `reversion_gap`) — promoted to active when statistically validated
-- Edge decay: signal scores decay as market approaches resolution
-- Signal scoring pipeline with cross-market comparison
+## Strategies
+| Strategy | Signal | Regime |
+|----------|--------|--------|
+| momentum | Follow 24h price direction (>5% move) | trending, neutral |
+| reversal | Fade large moves (>12% move) | mean_reverting, volatile |
+| volume_spike | Follow unusual volume (>2x expected) | illiquid_spike, neutral |
 
-### Layer 4 — Regime Detector
-- `MiniBatchKMeans` clustering for unsupervised market regime identification
-- Regime state persisted to `regime_state.json`
-- Bet sizing and strategy weights adjusted per regime
+## Key Configuration (config.py)
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| EDGE_THRESHOLD | 0.04 | Min 4% edge to generate signal |
+| KELLY_FRACTION | 0.25 | Quarter-Kelly sizing |
+| MAX_BET_PCT | 0.03 | Max 3% bankroll per bet |
+| MAX_OPEN_BETS | 5 | Max simultaneous positions |
+| MAX_POSITION_AGE_HOURS | 24 | Timeout stale positions |
+| STOP_LOSS_PCT | 0.50 | Close if loss > 50% of bet |
+| MAX_POSITIONS_PER_STRATEGY | 3 | Per-strategy concentration cap |
 
-### Layer 5 — Risk Manager
-- Quarter-Kelly sizing with configurable Kelly fraction
-- Empirical correlation matrix derived from historical strategy PnL pivots
-- Drawdown controller: reduces position sizes automatically under drawdown
-- Feature drift monitor: flags when live feature distribution diverges from training
-- Position timeout mechanism for stale open bets
-- `MAX_OPEN_BETS = 8` cap with bankroll exposure tracking
+## Execution Modes
+- **SHADOW**: Bet recorded but bankroll not reduced. Used during warmup (<30 closed bets) or when CLV is below threshold.
+- **ACTIVE**: Real paper bet, bankroll decremented. Promoted when strategy CLV > -0.20 (warmup) or > -0.05 (post-warmup).
 
-### Layer 6 — Evaluation Engine
-- **CLV (Closing Line Value)** is the north star metric — captured within 48-hour resolution window
-- Brier score, hit rate, Sharpe ratio tracked per strategy
-- Strategy killer: disables underperforming strategies after 50-bet minimum threshold + 12-hour cooldown
-- Full settlement statistics with per-strategy breakdowns
+## Database Schema (key tables)
+- `paper_bets` — all bets (SHADOW + ACTIVE), CLV columns, result
+- `price_history` — per-market price snapshots every cycle
+- `market_log` — signals generated per cycle
+- `alpha_signals` — shadow alpha module results
+- `decision_log` — meta decision engine audit trail
+- `bankroll_log` — equity curve data points
+- `bot_state` — persistent key-value store (weekly report timestamp etc.)
 
----
+## State Files
+| File | Purpose | Persistence |
+|------|---------|-------------|
+| polybot.db | All trading data | Railway disk + git backup |
+| bankroll.txt | Current bankroll | Railway disk + git backup |
+| regime_state.json | 3-cycle regime stability | Railway disk + git backup |
+| killed_strategies.json | Permanently disabled strategies | Railway disk + git backup |
+| daily_benchmarks.json | Today's activity counts | Railway disk + git backup |
 
-## Repository Structure
+## Critical Rules (Never Violate)
+1. `record_paper_bet()` requires `mode="SHADOW"` or `mode="ACTIVE"`
+2. ALTER TABLE migrations must be wrapped in `try/except` in `init_db()`
+3. `polybot.db` is tracked in git — never gitignore it
+4. Stop loss fires BEFORE resolved/stale checks in `settle_and_compute_clv()`
+5. Strategy cap checks count ACTIVE bets only, not SHADOW bets
+6. Weekly report timestamp stored in `bot_state` DB table, not `last_weekly.txt`
 
-```
-polybot/
-├── main.py                    ← entry point (single run, loop, backtest)
-├── config.py                  ← all tunable parameters
-├── requirements.txt
-│
-├── data/
-│   ├── markets.py             ← Gamma API fetch
-│   └── database.py            ← SQLite schema + queries
-│
-├── scoring/
-│   ├── filters.py             ← hard filters (liquidity, price range)
-│   ├── engine.py              ← 17-feature engineering + meta-model
-│   └── features.py            ← feature extraction pipeline
-│
-├── alpha/
-│   ├── strategies.py          ← active + shadow strategy implementations
-│   ├── meta_model.py          ← Sharpe-weighted strategy allocator
-│   └── regime.py              ← MiniBatchKMeans regime detector
-│
-├── backtest/
-│   └── walk_forward.py        ← walk-forward replay engine
-│
-├── alerts/
-│   └── telegram.py            ← Telegram Bot API alerts
-│
-├── tests/
-│   └── ...                    ← unit + integration tests
-│
-└── .github/workflows/
-    └── bot.yml                ← GitHub Actions (free 24/7 hosting)
-```
+## Known Failure Modes
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| POST /trigger returns 500 | Missing Flask import in webhook.py | Add `request` to Flask imports |
+| POST /trigger returns 401 | WEBHOOK_SECRET set but not sent by cron | Remove auth check from webhook.py |
+| Bot stuck in SHADOW mode | CLV below threshold, stats=None during warmup | Warmup gate: n_closed<30 → ACTIVE |
+| Bankroll shows $1000 always | git rebase overwriting bankroll.txt | Use `-X ours` rebase strategy |
+| Weekly report spamming | last_weekly.txt reset by git | Use bot_state DB table instead |
+| 0 signals | market_id accessed wrong in strategies.py | Use row["market_id"] not variable |
 
----
+## Dashboard
+Live monitoring at: `https://polybot-prediction-system.vercel.app`
 
-## Quickstart
+Reads from Railway's `/api/state` endpoint. Shows:
+- Bankroll + equity curve
+- Open/closed positions
+- Strategy performance
+- CLV tracking
 
-### 1. Install
-
+## Local Development
 ```bash
 pip install -r requirements.txt
+cp .env.example .env  # Add Telegram credentials
+python main.py         # Single run
+python main.py --loop  # Every 30 min
+python main.py --backtest  # Walk-forward backtest
 ```
 
-### 2. Configure Telegram (for alerts)
-
-1. Message `@BotFather` on Telegram → `/newbot` → copy token
-2. Message `@userinfobot` → copy your chat ID
-
-### 3. Set environment variables
-
-```bash
-# Mac/Linux
-export TELEGRAM_TOKEN=your_token_here
-export TELEGRAM_CHAT_ID=your_chat_id_here
-export BANKROLL=1000
-
-# Windows
-set TELEGRAM_TOKEN=your_token_here
-set TELEGRAM_CHAT_ID=your_chat_id_here
-set BANKROLL=1000
-```
-
-### 4. Run
-
-```bash
-# Single run (test)
-python main.py
-
-# Loop mode — runs every 30 minutes
-python main.py --loop
-
-# Walk-forward backtest on historical data
-python main.py --backtest
-
-# Flask dashboard (port 8080)
-python dashboard/server.py
-```
-
----
-
-## Free 24/7 Hosting via GitHub Actions
-
-1. Push to a GitHub repo
-2. Go to **Settings → Secrets → Actions** and add:
-   - `TELEGRAM_TOKEN`
-   - `TELEGRAM_CHAT_ID`
-   - `BANKROLL`
-3. Done — bot runs every 30 minutes, completely free
-
-> GitHub free tier = 2000 min/month. Bot uses ~1440 min/month. Zero cost.
-
----
-
-## Configuration Reference
-
-| Variable | Default | Description |
-|---|---|---|
-| `EDGE_THRESHOLD` | `0.04` | Min 4% edge to place a bet |
-| `KELLY_FRACTION` | `0.25` | Quarter-Kelly (conservative sizing) |
-| `MAX_BET_PCT` | `0.05` | Never bet >5% bankroll per position |
-| `MIN_LIQUIDITY` | `500` | Min $500 market liquidity |
-| `ALERT_COOLDOWN_HOURS` | `6` | Re-alert cooldown per market |
-| `MAX_OPEN_BETS` | `8` | Max simultaneous open positions |
-| `STRATEGY_MIN_BETS` | `50` | Min bets before strategy can be killed |
-| `CLV_WINDOW_HOURS` | `48` | Hours before resolution to capture CLV |
-| `DRAWDOWN_HALT_PCT` | `0.15` | Reduce sizing at 15% drawdown |
-
----
-
-## Metrics & Evaluation
-
-The primary evaluation signal is **CLV (Closing Line Value)** — not P&L.
-
-> CLV measures whether you bought at better odds than the market's final implied probability before resolution. Positive average CLV over 50+ bets is the only reliable signal that your edge is real and not noise.
-
-Secondary metrics tracked per strategy:
-- **Sharpe Ratio** — risk-adjusted returns
-- **Brier Score** — probability calibration quality
-- **Hit Rate** — raw win rate (least informative in isolation)
-- **Kelly-weighted P&L** — actual paper/live profit
-
----
-
-## Current Status
-
-| Component | Status |
-|---|---|
-| Data pipeline | ✅ Live |
-| 17-feature engineering | ✅ Live |
-| Meta-model (GBM) | ✅ Live |
-| Regime detection | ✅ Live |
-| Kelly sizing + drawdown control | ✅ Live |
-| CLV tracking | ✅ Live |
-| Strategy killer | ✅ Live |
-| Paper trading | ✅ Live |
-| Live execution (CLOB) | 🔧 Phase 3 |
-| External signals (news/Twitter) | 🔧 Future |
-
----
-
-## Honest Caveats
-
-- **Heuristic edge estimates are not calibrated probabilities.** The system's signals are engineered features, not outputs from a proper Bayesian model. Treat them accordingly.
-- **50+ closed bets per strategy is the minimum** to draw any conclusions about CLV. Don't kill strategies early — that's the strategy killer's job, with its built-in cooldown.
-- **58% bankroll deployment is normal**, not alarming. With `MAX_OPEN_BETS = 8` and 30-min cycles, this is expected capital accumulation across multiple positions.
-- **Correlation matrix is empirical.** It's derived from historical strategy PnL and updated over time. Early estimates with few data points should be treated as rough guides only.
-
----
-
-## Roadmap
-
-**Phase 1 (complete):** Real data + heuristic scoring + Telegram alerts + paper trades
-
-**Phase 2 (current):** ML models, CLV training targets, regime detection, alpha engine, risk management
-
-**Phase 3 (next):** Live execution via Polymarket CLOB API with full Polygon wallet integration
-
-**Phase 4 (future):** External signal ingestion (news, Twitter), cross-market arbitrage detection, ensemble probability calibration
-
----
-
-## Development Notes
-
-This project tracks CLV as its core training signal and uses walk-forward validation to prevent data leakage. The goal is not to over-engineer the system, but to accumulate enough real market observations to determine whether any of the current signals carry genuine predictive power.
-
-If they don't, the system will tell you — that's what the strategy killer and CLV tracking are for.
-
----
-
-## License
-
-MIT — use freely, fork freely, trade responsibly.
+## Environment Variables
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| TELEGRAM_TOKEN | Yes | Bot API token |
+| TELEGRAM_CHAT_ID | Yes | Target chat ID |
+| BANKROLL | No | Starting bankroll (default 1000) |
+| WEBHOOK_SECRET | No | Removed — not used |
