@@ -190,6 +190,16 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
     if raw_df.empty:
         send_error("No markets survived API intake. Check tag matching and upstream filters.")
         save_bankroll(bankroll)
+        try:
+            import sqlite3 as _sq
+            from datetime import datetime as _dt
+            _c = _sq.connect("polybot.db")
+            _c.execute("CREATE TABLE IF NOT EXISTS bankroll_log (ts TEXT, value REAL)")
+            _c.execute("INSERT INTO bankroll_log (ts, value) VALUES (?, ?)", (_dt.utcnow().isoformat(), bankroll))
+            _c.commit()
+            _c.close()
+        except Exception as _e:
+            pass
         return bankroll
     resolved_alpha = resolve_alpha_signals(raw_df)
     cycle_metrics["resolved_alpha_count"] = resolved_alpha
