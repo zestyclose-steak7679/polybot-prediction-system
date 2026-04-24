@@ -56,25 +56,26 @@ def health():
 @app.route("/api/state", methods=["GET"])
 def api_state():
     try:
+        bankroll = 1000.0
+        try:
+            bankroll = float(open("bankroll.txt").read().strip())
+        except:
+            pass
+
         con = sqlite3.connect("polybot.db")
         con.row_factory = sqlite3.Row
         cur = con.cursor()
 
-        try:
-            bankroll = float(open("bankroll.txt").read().strip())
-        except:
-            bankroll = 1000.0
-
-        cur.execute("SELECT * FROM bets WHERE status='open' ORDER BY placed_at DESC LIMIT 20")
+        cur.execute("SELECT * FROM paper_bets WHERE result='open' ORDER BY placed_at DESC LIMIT 20")
         open_bets = [dict(r) for r in cur.fetchall()]
 
-        cur.execute("SELECT * FROM bets WHERE status='closed' ORDER BY rowid DESC LIMIT 50")
+        cur.execute("SELECT * FROM paper_bets WHERE result!='open' ORDER BY rowid DESC LIMIT 50")
         closed_bets = [dict(r) for r in cur.fetchall()]
 
-        cur.execute("SELECT strategy, COUNT(*) as total, SUM(clv) as total_clv FROM bets WHERE status='closed' GROUP BY strategy")
+        cur.execute("SELECT strategy_tag as strategy, COUNT(*) as total, SUM(clv) as total_clv FROM paper_bets WHERE result!='open' GROUP BY strategy_tag")
         strategies = [dict(r) for r in cur.fetchall()]
 
-        cur.execute("SELECT * FROM bankroll_history ORDER BY timestamp DESC LIMIT 100")
+        cur.execute("SELECT * FROM market_log ORDER BY rowid DESC LIMIT 100")
         history = [dict(r) for r in cur.fetchall()]
 
         con.close()
@@ -84,7 +85,7 @@ def api_state():
             "open_bets": open_bets,
             "closed_bets": closed_bets,
             "strategies": strategies,
-            "bankroll_history": history,
+            "market_log": history,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
