@@ -89,6 +89,7 @@ def api_state():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@app.route("/api/state", methods=["GET"])  # already exists, skip
 
 @app.route("/", methods=["GET"])
 def root():
