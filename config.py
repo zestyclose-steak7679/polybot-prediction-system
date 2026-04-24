@@ -23,7 +23,7 @@ MIN_BETS_TO_EVAL  = 10    # don't judge a strategy until it has 10 bets
 STRATEGY_MIN_ROI  = -0.05 # disable strategy if ROI drops below -5%
 MAX_OPEN_BETS     = 5     # max simultaneous paper bets
 MAX_POSITIONS_PER_STRATEGY = 3
-MAX_POSITION_AGE_HOURS = 48  # recycle paper capital from stale positions
+MAX_POSITION_AGE_HOURS = 24  # recycle paper capital from stale positions
 STOP_LOSS_PCT     = 0.50  # close if loss > 50% of bet size
 
 # ── Market filters ────────────────────────────────────────
