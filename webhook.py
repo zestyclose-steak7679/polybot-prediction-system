@@ -88,8 +88,8 @@ def api_state():
         strategies = [dict(r) for r in cur.fetchall()]
 
         try:
-            cur.execute("SELECT ts, value FROM bankroll_log ORDER BY ts ASC")
-            history = [{"time": r[0], "value": r[1]} for r in cur.fetchall()]
+            cur.execute("SELECT ts as time, value FROM bankroll_log ORDER BY ts ASC")
+            history = [dict(r) for r in cur.fetchall()]
         except:
             history = []
 
