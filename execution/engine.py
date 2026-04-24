@@ -26,7 +26,27 @@ class ExecutionEngine:
         stats = compute_strategy_roi(strategy)
 
         if stats is None:
-            struct_logger.info("PROMOTION", "unknown", "skipped", {"strategy": strategy, "reason": "insufficient_data"})
+            # During warmup, insufficient data means keep ACTIVE
+            # not demote to SHADOW
+            try:
+                closed_bets = get_closed_bets(limit=500)
+                n_closed = len(closed_bets) if not closed_bets.empty else 0
+            except Exception:
+                n_closed = 0
+
+            if n_closed < 30:
+                struct_logger.info("PROMOTION", "unknown", "active", {
+                    "strategy": strategy,
+                    "reason": "warmup_insufficient_data",
+                    "n_closed": n_closed
+                })
+                return "ACTIVE"
+
+            struct_logger.info("PROMOTION", "unknown", "skipped", {
+                "strategy": strategy,
+                "reason": "insufficient_data",
+                "n_closed": n_closed
+            })
             return "SHADOW"
 
         avg_clv = stats.get("avg_clv")
