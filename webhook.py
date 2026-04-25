@@ -38,6 +38,9 @@ def trigger():
         global _running
         _running = True
         try:
+            import sys, os
+            sys.path.insert(0, str(_BASE_DIR))
+            os.chdir(str(_BASE_DIR))
             from main import run_cycle, load_bankroll, save_bankroll
             from data.database import init_db
             from data.price_history import init_price_history
