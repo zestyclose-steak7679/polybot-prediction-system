@@ -78,7 +78,7 @@ def api_state():
         # Try bankroll from DB first, then fall back to file
         try:
             tmp_con = sqlite3.connect(DB_PATH)
-            row = tmp_con.execute("SELECT value FROM bankroll_log ORDER BY rowid DESC LIMIT 1").fetchone()
+            row = tmp_con.execute("SELECT bankroll FROM bankroll_log ORDER BY rowid DESC LIMIT 1").fetchone()
             if row:
                 bankroll = row[0]
             tmp_con.close()
@@ -102,7 +102,7 @@ def api_state():
             exit_price REAL, closing_price REAL,
             pnl REAL, roi REAL, clv REAL, closed_at TEXT
         )""")
-        cur.execute("CREATE TABLE IF NOT EXISTS bankroll_log (ts TEXT, value REAL)")
+        cur.execute("CREATE TABLE IF NOT EXISTS bankroll_log (id INTEGER PRIMARY KEY AUTOINCREMENT, bankroll REAL, logged_at TEXT)")
         con.commit()
 
         cur.execute("SELECT * FROM paper_bets WHERE result='open' ORDER BY placed_at DESC LIMIT 20")
@@ -115,7 +115,7 @@ def api_state():
         strategies = [dict(r) for r in cur.fetchall()]
 
         try:
-            cur.execute("SELECT ts as time, value FROM bankroll_log ORDER BY ts ASC")
+            cur.execute("SELECT logged_at as time, bankroll as value FROM bankroll_log ORDER BY id ASC")
             history = [dict(r) for r in cur.fetchall()]
         except:
             history = []
