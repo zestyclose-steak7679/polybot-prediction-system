@@ -19,10 +19,14 @@ app = Flask(__name__)
 _lock = threading.Lock()
 _running = False
 
+DB_PATH = os.environ.get("DB_PATH", "polybot.db")
+DATA_DIR = os.environ.get("DATA_DIR", ".")
+BANKROLL_FILE = os.path.join(DATA_DIR, "bankroll.txt")
+
+
 @app.route("/trigger", methods=["POST"])
 def trigger():
     global _running
-
     if _running:
         return jsonify({"status": "already_running"}), 429
 
@@ -38,19 +42,6 @@ def trigger():
             bankroll = load_bankroll()
             bankroll = run_cycle(bankroll)
             save_bankroll(bankroll)
-            try:
-                import os
-                db_path = os.environ.get("DB_PATH", "polybot.db")
-                con = sqlite3.connect(db_path)
-                con.execute("CREATE TABLE IF NOT EXISTS bankroll_log (ts TEXT, value REAL)")
-                con.execute("INSERT INTO bankroll_log (ts, value) VALUES (?, ?)", 
-                            (datetime.utcnow().isoformat(), bankroll))
-                con.commit()
-                con.close()
-            except Exception as e:
-                logger.error(f"Bankroll log error: {e}")
-
-            
             logger.info("Webhook cycle complete")
         except Exception as e:
             logger.error(f"Webhook cycle failed: {e}")
@@ -61,22 +52,22 @@ def trigger():
     thread.start()
     return jsonify({"status": "triggered"}), 200
 
+
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({
-        "status": "ok",
-        "running": _running
-    }), 200
+    return jsonify({"status": "ok", "running": _running}), 200
+
+
 @app.route("/api/state", methods=["GET"])
 def api_state():
     try:
         bankroll = 1000.0
         try:
-            bankroll = float(open("bankroll.txt").read().strip())
+            bankroll = float(open(BANKROLL_FILE).read().strip())
         except:
             pass
 
-        con = sqlite3.connect("polybot.db")
+        con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
 
@@ -106,10 +97,12 @@ def api_state():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-@app.route("/api/state", methods=["GET"])  # already exists, skip
 
+
+@app.route("/", methods=["GET"])
 def root():
     return jsonify({"service": "polybot-webhook"}), 200
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
