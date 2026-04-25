@@ -23,6 +23,9 @@ DB_PATH = os.environ.get("DB_PATH", "polybot.db")
 DATA_DIR = os.environ.get("DATA_DIR", ".")
 BANKROLL_FILE = os.path.join(DATA_DIR, "bankroll.txt")
 
+# Ensure data directory exists
+os.makedirs(DATA_DIR, exist_ok=True)
+
 
 @app.route("/trigger", methods=["POST"])
 def trigger():
@@ -67,6 +70,7 @@ def api_state():
         except:
             pass
 
+        os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
