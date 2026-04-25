@@ -39,7 +39,9 @@ def trigger():
             bankroll = run_cycle(bankroll)
             save_bankroll(bankroll)
             try:
-                con = sqlite3.connect("polybot.db")
+                import os
+                db_path = os.environ.get("DB_PATH", "polybot.db")
+                con = sqlite3.connect(db_path)
                 con.execute("CREATE TABLE IF NOT EXISTS bankroll_log (ts TEXT, value REAL)")
                 con.execute("INSERT INTO bankroll_log (ts, value) VALUES (?, ?)", 
                             (datetime.utcnow().isoformat(), bankroll))
