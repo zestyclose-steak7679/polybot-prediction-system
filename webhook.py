@@ -44,6 +44,7 @@ def trigger():
             from main import run_cycle, load_bankroll, save_bankroll
             from data.database import init_db
             from data.price_history import init_price_history
+            logger.info(f"CWD: {os.getcwd()} | BASE: {_BASE_DIR} | sys.path[0]: {sys.path[0]}")
             init_db()
             init_price_history()
             bankroll = load_bankroll()
