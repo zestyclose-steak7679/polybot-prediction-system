@@ -68,11 +68,23 @@ def trigger():
 
 @app.route("/health", methods=["GET"])
 def health():
+    return jsonify({
+        "status": "ok",
+        "running": _running
+    }), 200
+@app.route("/api/state", methods=["GET", "OPTIONS"])
+
     return jsonify({"status": "ok", "running": _running}), 200
 
 
 @app.route("/api/state", methods=["GET"])
 def api_state():
+    if request.method == "OPTIONS":
+        response = app.make_default_options_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response
+
     try:
         bankroll = 1000.0
         try:
@@ -114,15 +126,26 @@ def api_state():
 
         con.close()
 
-        return jsonify({
+        response = jsonify({
             "bankroll": bankroll,
             "open_bets": open_bets,
             "closed_bets": closed_bets,
             "strategies": strategies,
             "bankroll_history": history,
         })
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response
     except Exception as e:
+
+        response = jsonify({"error": str(e)})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response, 500
+
+
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/", methods=["GET"])
