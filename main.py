@@ -671,7 +671,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         send_weekly_report(weekly_stats)
         weekly_file.write_text(str(now_ts))
 
-   import sqlite3
+    import sqlite3
     from config import DB_PATH as _DB_PATH2
     with sqlite3.connect(_DB_PATH2) as conn:
         count = conn.execute("SELECT COUNT(*) FROM paper_bets").fetchone()[0]
