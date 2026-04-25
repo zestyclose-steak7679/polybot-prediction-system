@@ -585,3 +585,16 @@ def update_decision_score(decision_id: int, clv_5m: float, clv_15m: float, clv_6
             )
     except Exception as e:
         logger.error(f"Error updating decision score for {decision_id}: {e}")
+def query_to_df(query: str, params=None) -> pd.DataFrame:
+    """Execute a SQL query and return results as a DataFrame."""
+    try:
+        with _conn() as con:
+            if params:
+                return pd.read_sql(query, con, params=params)
+            return pd.read_sql(query, con)
+    except Exception as e:
+        logger.error(f"query_to_df failed: {e}")
+        return pd.DataFrame()
+def get_db_connection():
+    """Return a database connection."""
+    return _conn()
