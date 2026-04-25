@@ -21,9 +21,9 @@ MAX_BET_PCT      = 0.03   # never bet more than 3% of bankroll per signal
 MAX_DRAWDOWN_PCT  = 0.20  # halt all betting if bankroll drops 20% from peak
 MIN_BETS_TO_EVAL  = 10    # don't judge a strategy until it has 10 bets
 STRATEGY_MIN_ROI  = -0.05 # disable strategy if ROI drops below -5%
-MAX_OPEN_BETS     = 8     # max simultaneous paper bets
+MAX_OPEN_BETS     = 5     # max simultaneous paper bets
 MAX_POSITIONS_PER_STRATEGY = 3
-MAX_POSITION_AGE_HOURS = 48  # recycle paper capital from stale positions
+MAX_POSITION_AGE_HOURS = 24  # recycle paper capital from stale positions
 STOP_LOSS_PCT     = 0.50  # close if loss > 50% of bet size
 
 # ── Market filters ────────────────────────────────────────
@@ -56,7 +56,16 @@ GAMMA_URL    = "https://gamma-api.polymarket.com"
 MARKET_LIMIT = 100
 
 # ── Database ──────────────────────────────────────────────
-DB_PATH = "polybot.db"
+DB_PATH = os.environ.get("DB_PATH", "/app/data/polybot.db")
+
+# ── State file paths ──────────────────────────────────────
+DATA_DIR          = os.environ.get("DATA_DIR", "/app/data")
+BANKROLL_FILE     = os.path.join(DATA_DIR, "bankroll.txt")
+PEAK_BANKROLL_FILE = os.path.join(DATA_DIR, "peak_bankroll.txt")
+LAST_TRAIN_FILE   = os.path.join(DATA_DIR, "last_train.txt")
+KILLED_FILE       = os.path.join(DATA_DIR, "killed_strategies.json")
+REGIME_FILE       = os.path.join(DATA_DIR, "regime_state.json")
+LAST_WEEKLY_FILE  = os.path.join(DATA_DIR, "last_weekly.txt")
 
 # ── Dedup window ─────────────────────────────────────────
 ALERT_COOLDOWN_HOURS = 6

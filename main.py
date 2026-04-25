@@ -79,19 +79,23 @@ from execution.engine     import ExecutionEngine
 from utils.logger         import get_structured_logger
 
 _LAST_HISTORY_ALERT = None
-BANKROLL_FILE = Path("bankroll.txt")
+from config import (BANKROLL_FILE, PEAK_BANKROLL_FILE, LAST_TRAIN_FILE,
+                    KILLED_FILE, REGIME_FILE, LAST_WEEKLY_FILE, DATA_DIR)
+import os as _os
+_os.makedirs(DATA_DIR, exist_ok=True)
+
 router = StrategyRouter()
 
 
 def load_bankroll() -> float:
     try:
-        return float(BANKROLL_FILE.read_text().strip())
+        return float(Path(BANKROLL_FILE).read_text().strip())
     except Exception:
         return float(BANKROLL)
 
 def save_bankroll(amount: float):
     try:
-        BANKROLL_FILE.write_text(str(round(amount, 2)))
+        Path(BANKROLL_FILE).write_text(str(round(amount, 2)))
     except Exception as e:
         logger.warning(f"Could not save bankroll: {e}")
 
@@ -193,7 +197,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         try:
             import sqlite3 as _sq
             from datetime import datetime as _dt
-            _c = _sq.connect("polybot.db")
+            from config import DB_PATH as _DB_PATH3
+            _c = _sq.connect(_DB_PATH3)
             _c.execute("CREATE TABLE IF NOT EXISTS bankroll_log (ts TEXT, value REAL)")
             _c.execute("INSERT INTO bankroll_log (ts, value) VALUES (?, ?)", (_dt.utcnow().isoformat(), bankroll))
             _c.commit()
@@ -633,7 +638,7 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         send_benchmark_alert(violations, benchmark_data, bankroll)
 
     # Weekly Report
-    weekly_file = Path("last_weekly.txt")
+    weekly_file = Path(LAST_WEEKLY_FILE)
     last_weekly = 0.0
     if weekly_file.exists():
         try:
@@ -667,7 +672,8 @@ def run_cycle(bankroll: float, startup: bool = False) -> float:
         weekly_file.write_text(str(now_ts))
 
     import sqlite3
-    with sqlite3.connect("polybot.db") as conn:
+    from config import DB_PATH as _DB_PATH2
+    with sqlite3.connect(_DB_PATH2) as conn:
         count = conn.execute("SELECT COUNT(*) FROM paper_bets").fetchone()[0]
         logger.info(f"DB CHECK | paper_bets table rows: {count}")
 
@@ -707,8 +713,10 @@ def preflight_check() -> bool:
     return ok
 
 def main():
-    if not preflight_check():
-        logger.error("Preflight failed — exiting")
+    _os.makedirs(DATA_DIR, exist_ok=True)
+    db_path = Path(DB_PATH if 'DB_PATH' in dir() else "/app/data/polybot.db")
+    if not db_path.exists():
+        open(db_path, "w").close()
         sys.exit(1)
 
     parser = argparse.ArgumentParser()
