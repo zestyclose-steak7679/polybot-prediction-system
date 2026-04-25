@@ -7,7 +7,9 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+_BASE_DIR = Path(__file__).parent
+sys.path.insert(0, str(_BASE_DIR))
+os.chdir(str(_BASE_DIR))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +25,6 @@ DB_PATH = os.environ.get("DB_PATH", "polybot.db")
 DATA_DIR = os.environ.get("DATA_DIR", ".")
 BANKROLL_FILE = os.path.join(DATA_DIR, "bankroll.txt")
 
-# Ensure data directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
 
 
