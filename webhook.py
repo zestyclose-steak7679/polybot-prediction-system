@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 import os
 import threading
 import logging
@@ -7,24 +7,31 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-_BASE_DIR = Path(__file__).parent
-sys.path.insert(0, str(_BASE_DIR))
-os.chdir(str(_BASE_DIR))
+# Resolve app root
+_BASE_DIR = Path(__file__).resolve().parent
+for _candidate in [_BASE_DIR, Path('/app')]:
+    if (_candidate / 'main.py').exists():
+        _APP_ROOT = _candidate
+        break
+else:
+    _APP_ROOT = _BASE_DIR
+
+sys.path.insert(0, str(_APP_ROOT))
+os.chdir(str(_APP_ROOT))
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 )
 logger = logging.getLogger("polybot.webhook")
+logger.info(f"APP_ROOT={_APP_ROOT} CWD={os.getcwd()}")
 
 app = Flask(__name__)
-_lock = threading.Lock()
 _running = False
 
-DB_PATH = os.environ.get("DB_PATH", "polybot.db")
-DATA_DIR = os.environ.get("DATA_DIR", ".")
+DB_PATH = os.environ.get("DB_PATH", str(_APP_ROOT / "polybot.db"))
+DATA_DIR = os.environ.get("DATA_DIR", str(_APP_ROOT))
 BANKROLL_FILE = os.path.join(DATA_DIR, "bankroll.txt")
-
 os.makedirs(DATA_DIR, exist_ok=True)
 
 
@@ -38,18 +45,12 @@ def trigger():
         global _running
         _running = True
         try:
-            import sys, os
-            # Try multiple possible app roots
-            for _path in [str(_BASE_DIR), '/app', os.path.dirname(os.path.abspath(__file__))]:
-                if os.path.exists(os.path.join(_path, 'main.py')):
-                    sys.path.insert(0, _path)
-                    os.chdir(_path)
-                    logger.info(f"App root found: {_path}")
-                    break
+            sys.path.insert(0, str(_APP_ROOT))
+            os.chdir(str(_APP_ROOT))
             from main import run_cycle, load_bankroll, save_bankroll
             from data.database import init_db
             from data.price_history import init_price_history
-            logger.info(f"CWD: {os.getcwd()} | BASE: {_BASE_DIR} | sys.path[0]: {sys.path[0]}")
+            logger.info(f"Cycle start | CWD={os.getcwd()} | path0={sys.path[0]}")
             init_db()
             init_price_history()
             bankroll = load_bankroll()
@@ -61,30 +62,17 @@ def trigger():
         finally:
             _running = False
 
-    thread = threading.Thread(target=run, daemon=True)
-    thread.start()
+    threading.Thread(target=run, daemon=True).start()
     return jsonify({"status": "triggered"}), 200
 
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({
-        "status": "ok",
-        "running": _running
-    }), 200
-@app.route("/api/state", methods=["GET", "OPTIONS"])
-
     return jsonify({"status": "ok", "running": _running}), 200
 
 
 @app.route("/api/state", methods=["GET"])
 def api_state():
-    if request.method == "OPTIONS":
-        response = app.make_default_options_response()
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        return response
-
     try:
         bankroll = 1000.0
         try:
@@ -92,7 +80,7 @@ def api_state():
         except:
             pass
 
-        os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
@@ -126,31 +114,20 @@ def api_state():
 
         con.close()
 
-        response = jsonify({
+        return jsonify({
             "bankroll": bankroll,
             "open_bets": open_bets,
             "closed_bets": closed_bets,
             "strategies": strategies,
             "bankroll_history": history,
         })
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        return response
     except Exception as e:
-
-        response = jsonify({"error": str(e)})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        return response, 500
-
-
         return jsonify({"error": str(e)}), 500
-
 
 
 @app.route("/", methods=["GET"])
 def root():
-    return jsonify({"service": "polybot-webhook"}), 200
+    return jsonify({"service": "polybot-webhook", "app_root": str(_APP_ROOT)}), 200
 
 
 if __name__ == "__main__":
