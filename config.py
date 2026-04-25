@@ -56,10 +56,10 @@ GAMMA_URL    = "https://gamma-api.polymarket.com"
 MARKET_LIMIT = 100
 
 # ── Database ──────────────────────────────────────────────
-DB_PATH = os.environ.get("DB_PATH", "/app/data/polybot.db")
+DB_PATH = os.environ.get("DB_PATH", "/app/storage/polybot.db")
 
 # ── State file paths ──────────────────────────────────────
-DATA_DIR          = os.environ.get("DATA_DIR", "/app/data")
+DATA_DIR = os.environ.get("DATA_DIR", "/app/storage")
 BANKROLL_FILE     = os.path.join(DATA_DIR, "bankroll.txt")
 PEAK_BANKROLL_FILE = os.path.join(DATA_DIR, "peak_bankroll.txt")
 LAST_TRAIN_FILE   = os.path.join(DATA_DIR, "last_train.txt")
