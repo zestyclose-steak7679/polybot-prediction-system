@@ -74,6 +74,18 @@ def api_state():
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS paper_bets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            market_id TEXT, question TEXT, strategy_tag TEXT,
+            side TEXT, entry_price REAL, bet_size REAL,
+            bankroll_at REAL, kelly_raw REAL, edge_est REAL,
+            confidence REAL, reason TEXT, placed_at TEXT,
+            mode TEXT DEFAULT 'ACTIVE', result TEXT DEFAULT 'open',
+            exit_price REAL, closing_price REAL,
+            pnl REAL, roi REAL, clv REAL, closed_at TEXT
+        )""")
+        cur.execute("CREATE TABLE IF NOT EXISTS bankroll_log (ts TEXT, value REAL)")
+        con.commit()
 
         cur.execute("SELECT * FROM paper_bets WHERE result='open' ORDER BY placed_at DESC LIMIT 20")
         open_bets = [dict(r) for r in cur.fetchall()]
