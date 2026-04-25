@@ -75,10 +75,18 @@ def health():
 def api_state():
     try:
         bankroll = 1000.0
+        # Try bankroll from DB first, then fall back to file
         try:
-            bankroll = float(open(BANKROLL_FILE).read().strip())
+            tmp_con = sqlite3.connect(DB_PATH)
+            row = tmp_con.execute("SELECT value FROM bankroll_log ORDER BY rowid DESC LIMIT 1").fetchone()
+            if row:
+                bankroll = row[0]
+            tmp_con.close()
         except:
-            pass
+            try:
+                bankroll = float(open(BANKROLL_FILE).read().strip())
+            except:
+                pass
 
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         con = sqlite3.connect(DB_PATH)
