@@ -50,6 +50,7 @@ def trigger():
             from main import run_cycle, load_bankroll, save_bankroll
             from data.database import init_db
             from data.price_history import init_price_history
+            logger.info(f"DB_PATH in thread: {os.environ.get('DB_PATH')} | config DB: {__import__('config').DB_PATH}")
             logger.info(f"Cycle start | CWD={os.getcwd()} | path0={sys.path[0]}")
             init_db()
             init_price_history()
